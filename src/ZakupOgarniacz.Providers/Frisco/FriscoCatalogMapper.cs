@@ -40,13 +40,27 @@ internal static class FriscoCatalogMapper
             ProductUrl: null, // odpowiedź nie zawiera slug-a strony produktu
             Categories: MapCategories(p.Categories),
             Price: MapPrice(p.Price),
-            Available: p.IsAvailable ?? false);
+            Available: p.IsAvailable ?? false)
+        {
+            PromotionalPrice = MapPromotion(p.Price),
+        };
     }
 
     private static Money? MapPrice(FriscoPriceDto? price)
     {
         var amount = price?.Price ?? price?.PriceAfterPromotion;
         return amount is { } value ? new Money(value) : null;
+    }
+
+    // Promocja tylko, gdy cena po promocji jest realnie niższa od regularnej.
+    private static Money? MapPromotion(FriscoPriceDto? price)
+    {
+        if (price?.PriceAfterPromotion is not { } promo)
+        {
+            return null;
+        }
+
+        return price.Price is { } regular && promo >= regular ? null : new Money(promo);
     }
 
     private static IReadOnlyList<string> MapCategories(List<FriscoCategoryDto>? categories)

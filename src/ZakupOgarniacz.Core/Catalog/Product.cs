@@ -19,4 +19,8 @@ public sealed record Product(
     string? ProductUrl,
     IReadOnlyList<string> Categories,
     Money? Price,
-    bool Available);
+    bool Available)
+{
+    /// <summary>Cena po promocji, jeśli produkt jest w promocji (inaczej <c>null</c>). <see cref="Price"/> to cena regularna.</summary>
+    public Money? PromotionalPrice { get; init; }
+}

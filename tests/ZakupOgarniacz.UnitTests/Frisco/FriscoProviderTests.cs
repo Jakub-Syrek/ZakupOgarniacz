@@ -72,6 +72,7 @@ public class FriscoProviderTests
         Assert.NotNull(first.Price);
         Assert.Equal(6.99m, first.Price!.Amount);
         Assert.Equal("PLN", first.Price.Currency);
+        Assert.Equal(4.79m, first.PromotionalPrice!.Amount); // priceAfterPromotion
         Assert.True(first.Available);
         Assert.Equal("https://res.cloudinary.com/dj484tw6k/image/upload/v1/be/99999.jpg", first.ImageUrl);
         Assert.Equal(["Warzywa i owoce", "Pomidory"], first.Categories); // sortowane wg depth
@@ -79,6 +80,7 @@ public class FriscoProviderTests
         var second = result.Items[1];
         Assert.False(second.Available);
         Assert.Equal(3.19m, second.Price!.Amount);
+        Assert.Null(second.PromotionalPrice); // brak promocji
         Assert.Empty(second.Categories);
     }
 

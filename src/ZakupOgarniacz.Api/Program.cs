@@ -8,8 +8,9 @@ builder.Services.AddOpenApi();
 // Sklep Frisco.pl (katalog + zamawianie) za ICatalogProvider / IOrderProvider.
 builder.Services.AddFriscoStore(builder.Configuration);
 
-// Magazyn koszyków (na razie in-memory).
-builder.Services.AddInMemoryCartStore();
+// Magazyn koszyków (EF Core + SQLite).
+builder.Services.AddSqliteCartStore(
+    builder.Configuration.GetConnectionString("Carts") ?? "Data Source=carts.db");
 
 var app = builder.Build();
 
