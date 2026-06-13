@@ -8,6 +8,9 @@ builder.Services.AddOpenApi();
 // Sklep Frisco.pl (katalog + zamawianie) za ICatalogProvider / IOrderProvider.
 builder.Services.AddFriscoStore(builder.Configuration);
 
+// Magazyn koszyków (na razie in-memory).
+builder.Services.AddInMemoryCartStore();
+
 var app = builder.Build();
 
 // Pipeline HTTP.
@@ -24,6 +27,9 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
 
 // Endpointy katalogu: /products/search, /products/{code}.
 app.MapCatalogEndpoints();
+
+// Endpointy koszyka: /carts (create/get/items/export).
+app.MapCartEndpoints();
 
 app.Run();
 

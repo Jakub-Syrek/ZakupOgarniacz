@@ -21,7 +21,7 @@ internal sealed class FakeCatalogProvider : ICatalogProvider
         ImageUrl: "https://www.carrefour.pl/img/111.jpg",
         ProductUrl: "https://www.carrefour.pl/produkt/111",
         Categories: ["Nabiał", "Mleko"],
-        Price: null,
+        Price: new Money(6.99m),
         Available: true);
 
     public Task<SearchResult> SearchAsync(string query, int page = 1, int pageSize = 20, CancellationToken cancellationToken = default) =>

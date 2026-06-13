@@ -97,9 +97,10 @@ README.md
    (`Product` z ceną, `Cart` / `CartItem`), endpointy katalogu.
 2. ✅ **Adapter Frisco (odczyt)** — wyszukiwanie z cenami przez `/offer/products/query`,
    mapowanie na modele domenowe (zweryfikowane end-to-end).
-3. **Koszyk + eksport** — budowa koszyka, `ExportCartAsync`, persystencja (EF Core + SQLite).
+3. 🟦 **Koszyk + eksport** — endpointy koszyka i `ExportCartAsync` gotowe (store in-memory);
+   persystencja (EF Core + SQLite) następna.
 4. **Auto-checkout (docelowo)** — `PlaceOrderAsync` (sesja / automatyzacja).
-5. **Dodatki** — kolejne sklepy za tym samym interfejsem, porównanie cen, frontend.
+5. **Dodatki** — kolejne sklepy za tym samym interfejsem (np. Pyszne jako agregator), porównanie cen, frontend.
 
 ## Start
 
@@ -115,6 +116,10 @@ Adapter Frisco działa „od ręki" (zwykły HTTP). Endpointy:
 | `GET` | `/health` | Health-check. |
 | `GET` | `/products/search?q={fraza}&page&pageSize` | Wyszukiwanie z cenami i dostępnością. |
 | `GET` | `/products/{code}` | Produkt po EAN/SKU/id (`404`, gdy brak). |
+| `POST` | `/carts` | Tworzy koszyk (`201`, zwraca `id`). |
+| `GET` | `/carts/{id}` | Koszyk: pozycje + suma (`404`, gdy brak). |
+| `POST` | `/carts/{id}/items` | Dodaje pozycję `{ code, quantity }` (scala po produkcie). |
+| `POST` | `/carts/{id}/export` | Eksport koszyka do listy (etap 1 „zamawiania"). |
 
 ```bash
 curl "http://localhost:<port>/products/search?q=mleko&pageSize=5"
