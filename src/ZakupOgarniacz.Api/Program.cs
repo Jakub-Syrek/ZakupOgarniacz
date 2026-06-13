@@ -5,8 +5,8 @@ var builder = WebApplication.CreateBuilder(args);
 // OpenAPI / Swagger — konfiguracja: https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
-// Sklep Carrefour (katalog + zamawianie) za ICatalogProvider / IOrderProvider.
-builder.Services.AddCarrefourStore(builder.Configuration);
+// Sklep Frisco.pl (katalog + zamawianie) za ICatalogProvider / IOrderProvider.
+builder.Services.AddFriscoStore(builder.Configuration);
 
 var app = builder.Build();
 
