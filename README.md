@@ -1,9 +1,12 @@
 # ZakupOgarniacz
 
-Serwis **ASP.NET Core** do zakupów spożywczych z naciskiem na **analizę żywieniową**.
-Rdzeniem aplikacji jest katalog produktów oraz profil żywieniowy koszyka; samo
-zamawianie jest opcjonalne i schowane za interfejsem, żeby dało się je dołożyć
-później bez ruszania reszty.
+Serwis **ASP.NET Core** do **automatyzacji zakupów spożywczych online**. Rdzeniem jest
+zbudowanie koszyka z katalogu sklepu i możliwie daleko posunięta automatyzacja drogi do
+złożenia zamówienia — od listy/koszyka, przez eksport/deep-link, po (docelowo) złożenie
+zamówienia za użytkownika.
+
+Pierwszy cel: **Carrefour.pl**. Architektura jest **sklep-agnostyczna** (adapter pattern),
+więc kolejne sklepy dochodzą za tymi samymi interfejsami.
 
 <!-- Badge do uzupełnienia po podpięciu CI:
 [![build](https://img.shields.io/badge/build-todo-lightgrey)]()
@@ -15,39 +18,53 @@ później bez ruszania reszty.
 
 ## Cel i zakres
 
-- **Rdzeń (priorytet):** wyszukiwanie produktów spożywczych i analiza ich wartości
-  odżywczych — kalorie, makroskładniki, składniki, alergeny, Nutri-Score.
-- **Koszyk analityczny:** zamiast „złóż zamówienie" — „zbuduj koszyk i policz jego
-  profil żywieniowy" (suma i gęstość odżywcza, ostrzeżenia np. o wysokim cukrze/soli,
-  porównywanie produktów).
-- **Zamawianie / eksport (opcjonalnie, później):** za interfejsem `IOrderProvider`.
-  Uwaga: publiczne API do *składania* zamówień w sklepach spożywczych są rzadkością,
-  więc realistycznie ta część kończy się na eksporcie koszyka (deep-link / lista),
-  a nie pełnym programowym checkoucie.
+- **Katalog sklepu (odczyt):** wyszukiwanie produktów z **cenami i dostępnością**.
+- **Koszyk:** budowanie koszyka po naszej stronie (pozycje, ilości, podsumowanie ceny).
+- **Zamawianie — etapowo:**
+  1. **Eksport koszyka / deep-link** do sklepu (finalne „zamów" klika człowiek).
+  2. **Docelowo:** automatyczne dodanie do koszyka i złożenie zamówienia za `IOrderProvider`.
 
-Źródło danych żywieniowych: **Open Food Facts** (otwarte, darmowe API) — wpięte jako
-adapter `OpenFoodFactsProvider` za interfejsem `ICatalogProvider`, więc wymienialne.
+> Analiza żywieniowa **nie** jest celem projektu — wcześniejszy kierunek (Nutri-Score,
+> makroskładniki, Open Food Facts) został porzucony na rzecz automatyzacji zakupów.
+
+## Realia integracji (ważne)
+
+Sklepy spożywcze **nie udostępniają publicznego API** do składania zamówień jako klient:
+
+- **Carrefour.pl** — własna platforma e-commerce, brak oficjalnego API; strona stoi za
+  **Cloudflare Bot Management**, więc zwykły HTTP-klient dostaje `403`. Realna integracja
+  wymaga ruchu „przeglądarkowego" (np. Playwright, ewentualnie z sesją zalogowanego
+  użytkownika).
+- **Auchan** — zakupy online przeniesione na zamkniętą platformę **Ocado**, bez
+  publicznego API klienckiego.
+
+Stąd integracja jest **nieoficjalna** (reverse-engineering wewnętrznych endpointów sklepu),
+z natury krucha i potencjalnie wbrew regulaminowi — przeznaczona do automatyzacji
+**własnych** zakupów. Mechanizm jest schowany za interfejsami w `Core`, więc wymienialny
+bez ruszania reszty aplikacji.
 
 ## Architektura
 
-Projektowana **provider-agnostycznie** (adapter pattern). Reszta aplikacji nie wie,
-z jakiego konkretnie źródła pochodzą dane — zależy tylko od interfejsów w `Core`.
+Projektowana **provider-agnostycznie** (adapter pattern). Reszta aplikacji nie wie, z jakiego
+sklepu pochodzą dane ani jak technicznie realizowane jest zamówienie — zależy tylko od
+interfejsów w `Core`.
 
 | Projekt | Rola |
 | --- | --- |
-| `ZakupOgarniacz.Core` | Domeny i interfejsy (`ICatalogProvider`, `IOrderProvider`), logika analizy żywieniowej |
-| `ZakupOgarniacz.Providers` | Adaptery do zewnętrznych API (`OpenFoodFactsProvider`, …) |
-| `ZakupOgarniacz.Infrastructure` | EF Core, klienty HTTP, Polly (resilience), cache |
+| `ZakupOgarniacz.Core` | Domeny i interfejsy (`ICatalogProvider`, `IOrderProvider`), logika koszyka |
+| `ZakupOgarniacz.Providers` | Adaptery sklepów (`CarrefourProvider`, …) |
+| `ZakupOgarniacz.Infrastructure` | Klienci HTTP / automatyzacja przeglądarki, Polly (resilience), cache, (później) EF Core |
 | `ZakupOgarniacz.Api` | Host Web API (minimal API), DI, OpenAPI/Swagger |
 
 Kluczowe interfejsy w `Core`:
 
-- `ICatalogProvider` — `SearchAsync`, `GetProductAsync`, `GetNutritionAsync`
-- `IOrderProvider` — `CreateCartAsync`, `AddItemAsync`, `PlaceOrderAsync` lub `ExportCartAsync`
+- `ICatalogProvider` — `SearchAsync`, `GetProductAsync` (produkt z ceną i dostępnością)
+- `IOrderProvider` — `ExportCartAsync` (deep-link / lista) → docelowo `PlaceOrderAsync`
 
-Przekrojowo: `IHttpClientFactory` + typed clients, **Polly** (retry, circuit breaker)
-przez `Microsoft.Extensions.Http.Resilience`, cache katalogu, **Serilog**, OpenAPI.
-Persystencja: **EF Core + SQLite** na start (koszyk, historia cen), przełączalne na Postgres.
+Przekrojowo: `IHttpClientFactory` + typed clients lub automatyzacja przeglądarki,
+**Polly** (retry, circuit breaker) przez `Microsoft.Extensions.Http.Resilience`, cache
+katalogu, **Serilog**, OpenAPI. Persystencja koszyka/historii: **EF Core + SQLite**
+(dochodzi w późniejszym kroku), przełączalne na Postgres.
 
 ## Struktura repo
 
@@ -69,18 +86,21 @@ README.md
 ## Stack
 
 - .NET 10 (LTS), ASP.NET Core Web API (minimal API)
-- EF Core (SQLite → opcjonalnie Postgres)
 - Microsoft.Extensions.Http.Resilience (Polly), Serilog, OpenAPI
+- (do adaptera sklepu) automatyzacja przeglądarki — np. Playwright — z uwagi na Cloudflare
+- EF Core (SQLite → opcjonalnie Postgres) — krok później
 - xUnit + Microsoft.AspNetCore.Mvc.Testing
 
 ## Roadmapa
 
-1. **Szkielet + read-only katalog** — `ICatalogProvider`, adapter Open Food Facts,
-   endpointy `search` / `product` z danymi żywieniowymi.
-2. **Koszyk + persystencja** — EF Core, model `Cart`/`CartItem`, profil żywieniowy koszyka.
-3. **Analiza** — sumy i gęstość odżywcza, ostrzeżenia, porównania produktów.
-4. **Eksport koszyka** (opcjonalnie) — `IOrderProvider` jako deep-link / lista.
-5. **Dodatki** — śledzenie cen (`BackgroundService`), powiadomienia, frontend (Blazor/MAUI).
+1. **Domena + szkielet** — interfejsy `ICatalogProvider` / `IOrderProvider`, modele
+   (`Product` z ceną, `Cart` / `CartItem`), endpointy katalogu i koszyka.
+2. **Adapter Carrefour (odczyt)** — rekonesans i reverse-engineering wyszukiwania/produktu,
+   obejście Cloudflare (przeglądarka). Mapowanie na modele domenowe.
+3. **Koszyk + eksport** — budowa koszyka, `ExportCartAsync` (deep-link / lista),
+   persystencja koszyka (EF Core + SQLite).
+4. **Auto-checkout (docelowo)** — `PlaceOrderAsync` przez sesję / automatyzację przeglądarki.
+5. **Dodatki** — kolejne sklepy za tym samym interfejsem, porównanie cen, frontend.
 
 ## Start
 
@@ -92,7 +112,6 @@ dotnet run --project src/ZakupOgarniacz.Api
 ## Konwencje
 
 - **Conventional Commits.**
-- Pierwszy commit może wylądować na `master`; cała dalsza praca na branchach
-  tworzonych od `master`.
+- Pierwszy commit wylądował na `master`; cała dalsza praca na branchach tworzonych od `master`.
 - `CLAUDE.md` jest w `.gitignore` i **nie jest** wersjonowany.
 - Przy zmianach w CI/CD aktualizować badge w README (build, tests, coverage, wersja .NET).
