@@ -109,6 +109,25 @@ dotnet build
 dotnet run --project src/ZakupOgarniacz.Api
 ```
 
+### Adapter Carrefour (Playwright)
+
+Katalog Carrefour działa przez **Playwright** (wymóg Cloudflare — patrz „Realia integracji").
+Aby endpointy `/products/*` realnie odpytywały sklep, trzeba jednorazowo zainstalować
+przeglądarki Playwright po zbudowaniu projektu:
+
+```bash
+pwsh src/ZakupOgarniacz.Api/bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
+Konfiguracja w sekcji `Carrefour` w `appsettings.json` (`BaseUrl`, `Headless`, `UserDataDir`).
+Wskazanie trwałego `UserDataDir` (profil, który raz przeszedł Cloudflare / jest zalogowany)
+mocno zwiększa skuteczność. Endpointy:
+
+| Metoda | Ścieżka | Opis |
+| --- | --- | --- |
+| `GET` | `/products/search?q={fraza}&page&pageSize` | Wyszukiwanie (cena `null` — zależy od sklepu). |
+| `GET` | `/products/{code}` | Produkt po EAN/SKU/id (`404`, gdy brak). |
+
 ## Konwencje
 
 - **Conventional Commits.**

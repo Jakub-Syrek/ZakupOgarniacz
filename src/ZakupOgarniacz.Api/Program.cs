@@ -1,7 +1,12 @@
+using ZakupOgarniacz.Api.Endpoints;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // OpenAPI / Swagger — konfiguracja: https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Sklep Carrefour (katalog + zamawianie) za ICatalogProvider / IOrderProvider.
+builder.Services.AddCarrefourStore(builder.Configuration);
 
 var app = builder.Build();
 
@@ -13,10 +18,12 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// Prosty health-check. Właściwe endpointy katalogu (search/product)
-// dochodzą w kroku 1 roadmapy — za interfejsem ICatalogProvider.
+// Health-check.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
    .WithName("HealthCheck");
+
+// Endpointy katalogu: /products/search, /products/{code}.
+app.MapCatalogEndpoints();
 
 app.Run();
 
