@@ -89,6 +89,25 @@ dotnet build
 dotnet run --project src/ZakupOgarniacz.Api
 ```
 
+## API (krok 1: read-only katalog)
+
+| Metoda | Ścieżka | Opis |
+| --- | --- | --- |
+| `GET` | `/health` | Health-check. |
+| `GET` | `/products/search?q={fraza}&page={n}&pageSize={n}` | Wyszukiwanie produktów. `page` ≥ 1, `pageSize` 1–100 (domyślnie 1 / 20). Brak `q` → `400`. |
+| `GET` | `/products/{code}` | Pełny produkt po kodzie kreskowym (`404`, gdy brak). |
+| `GET` | `/products/{code}/nutrition` | Same wartości odżywcze produktu. |
+
+Dane pochodzą z **Open Food Facts** (`ICatalogProvider` → `OpenFoodFactsProvider`);
+konfiguracja w sekcji `OpenFoodFacts` w `appsettings.json` (`BaseUrl`, `UserAgent`).
+W trybie Development dokument OpenAPI jest pod `/openapi/v1.json`. `NutriScore`
+serializuje się jako tekst (`"A"`…`"E"`, `"Unknown"`).
+
+```bash
+curl "http://localhost:<port>/products/search?q=mleko&pageSize=5"
+curl "http://localhost:<port>/products/3017620422003"
+```
+
 ## Konwencje
 
 - **Conventional Commits.**
