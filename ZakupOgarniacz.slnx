@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ZakupOgarniacz.Api/ZakupOgarniacz.Api.csproj" />
+    <Project Path="src/ZakupOgarniacz.Core/ZakupOgarniacz.Core.csproj" />
+    <Project Path="src/ZakupOgarniacz.Infrastructure/ZakupOgarniacz.Infrastructure.csproj" />
+    <Project Path="src/ZakupOgarniacz.Providers/ZakupOgarniacz.Providers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ZakupOgarniacz.IntegrationTests/ZakupOgarniacz.IntegrationTests.csproj" />
+    <Project Path="tests/ZakupOgarniacz.UnitTests/ZakupOgarniacz.UnitTests.csproj" />
+  </Folder>
+</Solution>

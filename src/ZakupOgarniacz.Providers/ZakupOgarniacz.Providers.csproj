@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ZakupOgarniacz.Core\ZakupOgarniacz.Core.csproj" />
+  </ItemGroup>
+
+</Project>
