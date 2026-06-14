@@ -68,12 +68,13 @@
 
       <hr style="border-color:var(--line); margin:16px 0">
       <h2>Auto-checkout (Frisco)</h2>
-      <div class="muted" style="margin-bottom:8px">Wklej token z sesji Frisco (DevTools → Network → nagłówek Authorization). Trzymany tylko w pamięci aplikacji; możesz go odświeżyć, gdy wygaśnie.</div>
+      <div class="muted" style="margin-bottom:8px">Wklej <b>refresh_token</b> z sesji Frisco (DevTools → Network → <code>POST /connect/token</code> → pole <code>refresh_token</code>). Apka sama mintuje i odnawia access-token. Trzymane tylko w pamięci.</div>
       <input id="fUserId" class="qty" style="width:100%;margin-bottom:6px" placeholder="userId (np. 1831066)">
-      <input id="fToken" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="token">
-      <input id="fScheme" class="qty" style="width:100%;margin-bottom:6px" placeholder="schemat (domyślnie Bearer)">
+      <input id="fRefresh" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="refresh_token (zalecane)">
+      <input id="fClientId" class="qty" style="width:100%;margin-bottom:6px" placeholder="client_id (domyślnie frisco-web)">
+      <input id="fToken" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="albo access_token (wygasa ~10 min)">
       <div class="row">
-        <button id="saveTokenBtn" style="flex:1">Zapisz token</button>
+        <button id="saveTokenBtn" style="flex:1">Zapisz</button>
         <button id="checkFriscoBtn" style="flex:1">Sprawdź koszyk Frisco</button>
       </div>
       <div id="friscoStatus" class="muted" style="margin-top:8px"></div>
@@ -173,11 +174,15 @@
     }
 
     async function saveToken() {
-      const userId = $("fUserId").value.trim(), accessToken = $("fToken").value.trim(), authScheme = $("fScheme").value.trim() || undefined;
-      if (!userId || !accessToken) { $("friscoStatus").textContent = "Podaj userId i token."; return; }
+      const userId = $("fUserId").value.trim();
+      const refreshToken = $("fRefresh").value.trim() || undefined;
+      const clientId = $("fClientId").value.trim() || undefined;
+      const accessToken = $("fToken").value.trim() || undefined;
+      if (!userId || (!refreshToken && !accessToken)) { $("friscoStatus").textContent = "Podaj userId i refresh_token (lub access_token)."; return; }
       try {
-        await api("/frisco/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, accessToken, authScheme }) });
-        $("fToken").value = ""; $("friscoStatus").textContent = "Token zapisany ✓";
+        const r = await api("/frisco/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, refreshToken, clientId, accessToken }) });
+        $("fRefresh").value = ""; $("fToken").value = "";
+        $("friscoStatus").textContent = "Zapisano ✓ (tryb: " + (r.mode || "?") + ")";
       } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
     }
 

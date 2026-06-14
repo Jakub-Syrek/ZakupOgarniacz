@@ -61,16 +61,27 @@ app.MapGet("/frisco/cart", async (FriscoCheckoutClient client, CancellationToken
 .WithName("FriscoCartRaw")
 .WithTags("FriscoCheckout");
 
-// Token edytowalny w locie: ustaw / sprawdź status (token tylko w pamięci procesu).
+// Poświadczenia edytowalne w locie (tylko w pamięci): refresh_token (zalecane) lub access-token.
 app.MapPost("/frisco/token", (SetFriscoTokenRequest request, FriscoCredentialStore store) =>
 {
-    if (string.IsNullOrWhiteSpace(request.UserId) || string.IsNullOrWhiteSpace(request.AccessToken))
+    if (string.IsNullOrWhiteSpace(request.UserId))
     {
-        return Results.BadRequest(new { error = "userId i accessToken są wymagane." });
+        return Results.BadRequest(new { error = "userId jest wymagany." });
     }
 
-    store.Set(request.UserId, request.AccessToken, request.AuthScheme);
-    return Results.Ok(new { configured = true });
+    if (!string.IsNullOrWhiteSpace(request.RefreshToken))
+    {
+        store.SetRefreshToken(request.UserId, request.RefreshToken, request.ClientId);
+        return Results.Ok(new { configured = true, mode = "refresh" });
+    }
+
+    if (!string.IsNullOrWhiteSpace(request.AccessToken))
+    {
+        store.SetAccessToken(request.UserId, request.AccessToken);
+        return Results.Ok(new { configured = true, mode = "access" });
+    }
+
+    return Results.BadRequest(new { error = "Podaj refreshToken (zalecane) albo accessToken." });
 })
 .WithName("SetFriscoToken")
 .WithTags("FriscoCheckout");
@@ -82,8 +93,12 @@ app.MapGet("/frisco/token/status", (FriscoCredentialStore store) =>
 
 app.Run();
 
-// Żądanie ustawienia tokena Frisco (auto-checkout).
-internal sealed record SetFriscoTokenRequest(string UserId, string AccessToken, string? AuthScheme);
+// Żądanie ustawienia poświadczeń Frisco (auto-checkout). Podaj refreshToken lub accessToken.
+internal sealed record SetFriscoTokenRequest(
+    string UserId,
+    string? AccessToken,
+    string? RefreshToken,
+    string? ClientId);
 
 // Udostępnione dla testów integracyjnych (WebApplicationFactory<Program>).
 public partial class Program { }

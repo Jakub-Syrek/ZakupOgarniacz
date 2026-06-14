@@ -13,6 +13,12 @@ public sealed class FriscoCheckoutOptions
     /// <summary>Baza API (commerce-proxy). Musi kończyć się ukośnikiem.</summary>
     public string BaseUrl { get; set; } = "https://www.frisco.pl/app/commerce/api/v1/";
 
+    /// <summary>Endpoint OAuth2 do odświeżania tokena (OpenIddict).</summary>
+    public string TokenEndpoint { get; set; } = "https://www.frisco.pl/app/commerce/connect/token";
+
+    /// <summary>client_id dla grant refresh_token (do potwierdzenia z przechwyconego żądania).</summary>
+    public string ClientId { get; set; } = "frisco-web";
+
     /// <summary>Id zalogowanego użytkownika Frisco (z URL-i <c>/users/{id}/…</c>).</summary>
     public string? UserId { get; set; }
 
