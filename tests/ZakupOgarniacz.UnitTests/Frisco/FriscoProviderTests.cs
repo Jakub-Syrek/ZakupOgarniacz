@@ -93,7 +93,7 @@ public class FriscoProviderTests
 
         var url = handler.LastRequestUri!.AbsoluteUri;
         Assert.Contains("offer/products/query", url);
-        Assert.Contains("query=mleko%20bez%20laktozy", url);
+        Assert.Contains("search=mleko%20bez%20laktozy", url);
         Assert.Contains("pageIndex=3", url);
         Assert.Contains("pageSize=10", url);
     }

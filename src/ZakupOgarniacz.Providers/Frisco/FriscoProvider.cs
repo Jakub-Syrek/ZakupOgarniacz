@@ -23,8 +23,10 @@ public sealed class FriscoProvider : ICatalogProvider
         int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
+        // Uwaga: fraza idzie w parametrze `search` (NIE `query` — ten jest ignorowany
+        // i zwraca cały katalog posortowany po promocji).
         var url =
-            $"offer/products/query?query={Uri.EscapeDataString(query)}&pageIndex={Math.Max(1, page)}&pageSize={pageSize}";
+            $"offer/products/query?search={Uri.EscapeDataString(query)}&pageIndex={Math.Max(1, page)}&pageSize={pageSize}";
 
         var response = await _http.GetFromJsonAsync<FriscoQueryResponse>(url, JsonOptions, cancellationToken);
 
