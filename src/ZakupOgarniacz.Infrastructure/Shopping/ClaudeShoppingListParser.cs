@@ -61,18 +61,23 @@ public sealed class ClaudeShoppingListParser : IShoppingListParser
 
     public bool IsConfigured => _client is not null;
 
-    public async Task<IReadOnlyList<ShoppingItem>> ParseAsync(string command, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ShoppingItem>> ParseAsync(
+        string command,
+        IReadOnlyList<string> preferences,
+        CancellationToken cancellationToken = default)
     {
         if (_client is null)
         {
             throw new InvalidOperationException("Brak klucza Anthropic API (sekcja Claude / ANTHROPIC_API_KEY).");
         }
 
+        var system = BuildSystemPrompt(preferences);
+
         var parameters = new MessageCreateParams
         {
             Model = _options.Model,
             MaxTokens = 1024,
-            System = SystemPrompt,
+            System = system,
             OutputConfig = new OutputConfig
             {
                 Format = new JsonOutputFormat { Schema = Schema },
@@ -93,6 +98,28 @@ public sealed class ClaudeShoppingListParser : IShoppingListParser
             .Where(i => !string.IsNullOrWhiteSpace(i.Query))
             .Select(i => new ShoppingItem(i.Query!.Trim(), i.Quantity < 1 ? 1 : i.Quantity))
             .ToList();
+    }
+
+    private static string BuildSystemPrompt(IReadOnlyList<string> preferences)
+    {
+        var favourites = (preferences ?? [])
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .ToList();
+
+        if (favourites.Count == 0)
+        {
+            return SystemPrompt;
+        }
+
+        var list = string.Join("\n", favourites.Select(p => "- " + p));
+        return SystemPrompt + "\n\n" + $"""
+            Preferencje użytkownika (ULUBIONE — traktuj PRIORYTETOWO, większa waga przy wyborze):
+            {list}
+            Gdy któraś preferencja pasuje do pozycji (marka, rodzaj, konkretny produkt), wpleć ją w `query`
+            (np. ulubiona marka mleka => „mleko <marka>"). Jeśli polecenie jest ogólne (np. „zrób zakupy na tydzień"),
+            chętniej uwzględniaj ulubione. Nie dodawaj ulubionych, które nie pasują do polecenia.
+            """;
     }
 
     private static JsonElement ToElement(object value) => JsonSerializer.SerializeToElement(value);

@@ -13,5 +13,12 @@ public interface IShoppingListParser
     /// <summary>Czy parser jest skonfigurowany (np. czy ma klucz API).</summary>
     bool IsConfigured { get; }
 
-    Task<IReadOnlyList<ShoppingItem>> ParseAsync(string command, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Zamienia polecenie na listę pozycji. <paramref name="preferences"/> to ulubione
+    /// (marki/produkty), które parser ma traktować priorytetowo przy wyborze.
+    /// </summary>
+    Task<IReadOnlyList<ShoppingItem>> ParseAsync(
+        string command,
+        IReadOnlyList<string> preferences,
+        CancellationToken cancellationToken = default);
 }

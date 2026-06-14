@@ -42,6 +42,10 @@
     .total { display:flex; justify-content:space-between; font-weight:700; margin:12px 0; font-size:16px; }
     .muted { color:var(--muted); font-size:12px; }
     .note { font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:12px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--accent); color:var(--txt); border-radius:999px; padding:4px 6px 4px 11px; font-size:12px; margin:0 6px 6px 0; }
+    .chip .chipx { background:none; border:none; color:var(--muted); padding:0 2px; font-size:15px; line-height:1; cursor:pointer; }
+    .chip .chipx:hover { color:var(--warn); }
+    #prefList:empty { display:none; }
     pre { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:12px; max-height:220px; overflow:auto; }
     .empty { color:var(--muted); padding:40px; text-align:center; }
     /* --- logo / branding (szmery-bajery) --- */
@@ -106,6 +110,11 @@
         <input id="cmd" class="qty" style="flex:1" placeholder="Powiedz, co kupić… np. 3 bochenki ciemnego pieczywa, czekoladę, pomarańcze, brzoskwinie i borówki">
         <button class="primary" id="cmdBtn">Wygeneruj koszyk</button>
       </div>
+      <div class="row" style="margin-bottom:6px">
+        <input id="prefInput" class="qty" style="flex:1" placeholder="Ulubione (priorytet przy wyborze) — np. Łaciate, tofu, awokado… Enter dodaje">
+        <button id="prefAddBtn">★ Dodaj do ulubionych</button>
+      </div>
+      <div id="prefList" style="margin-bottom:10px"></div>
       <div id="cmdOut" class="muted" style="margin-bottom:10px"></div>
       <div id="status" class="muted"></div>
       <div id="grid" class="grid"></div>
@@ -287,6 +296,25 @@
       } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
     }
 
+    let prefs = [];
+    try { prefs = JSON.parse(localStorage.getItem("prefs") || "[]"); } catch { prefs = []; }
+    const escPref = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    function renderPrefs() {
+      $("prefList").innerHTML = prefs.map((p, i) =>
+        `<span class="chip">★ ${escPref(p)}<button class="chipx" data-i="${i}" aria-label="Usuń">×</button></span>`).join("");
+      $("prefList").querySelectorAll(".chipx").forEach(b =>
+        b.addEventListener("click", () => { prefs.splice(+b.dataset.i, 1); savePrefs(); }));
+    }
+    function savePrefs() { localStorage.setItem("prefs", JSON.stringify(prefs)); renderPrefs(); }
+    function addPref() {
+      const v = $("prefInput").value.trim();
+      if (v && !prefs.some(p => p.toLowerCase() === v.toLowerCase())) { prefs.push(v); savePrefs(); }
+      $("prefInput").value = "";
+    }
+    $("prefAddBtn").addEventListener("click", addPref);
+    $("prefInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addPref(); } });
+    renderPrefs();
+
     async function fromCommand() {
       const command = $("cmd").value.trim();
       if (!command) return;
@@ -294,7 +322,7 @@
       try {
         const r = await fetch("/carts/from-command", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ command, cartId: cartId || undefined })
+          body: JSON.stringify({ command, cartId: cartId || undefined, preferences: prefs })
         });
         if (r.status === 503) { $("cmdOut").textContent = "Parser niedostępny: ustaw klucz Anthropic API (ANTHROPIC_API_KEY)."; return; }
         if (!r.ok) { $("cmdOut").textContent = "Błąd: HTTP " + r.status; return; }

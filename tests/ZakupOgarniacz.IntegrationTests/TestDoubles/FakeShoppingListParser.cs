@@ -7,6 +7,9 @@ internal sealed class FakeShoppingListParser : IShoppingListParser
 {
     public bool IsConfigured => true;
 
-    public Task<IReadOnlyList<ShoppingItem>> ParseAsync(string command, CancellationToken cancellationToken = default) =>
+    public Task<IReadOnlyList<ShoppingItem>> ParseAsync(
+        string command,
+        IReadOnlyList<string> preferences,
+        CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ShoppingItem>>([new ShoppingItem("mleko", 2)]);
 }

@@ -12,7 +12,7 @@ public static class CartEndpoints
     public sealed record AddItemRequest(string Code, int Quantity = 1);
 
     /// <summary>Żądanie zbudowania koszyka z polecenia w naturalnym języku.</summary>
-    public sealed record FromCommandRequest(string Command, string? CartId);
+    public sealed record FromCommandRequest(string Command, string? CartId, IReadOnlyList<string>? Preferences = null);
 
     public static IEndpointRouteBuilder MapCartEndpoints(this IEndpointRouteBuilder app)
     {
@@ -43,10 +43,15 @@ public static class CartEndpoints
                 return Results.Problem("Brak klucza Anthropic API (sekcja Claude / ANTHROPIC_API_KEY).", statusCode: 503);
             }
 
+            var preferences = (request.Preferences ?? [])
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .ToList();
+
             IReadOnlyList<ShoppingItem> items;
             try
             {
-                items = await parser.ParseAsync(request.Command, cancellationToken);
+                items = await parser.ParseAsync(request.Command, preferences, cancellationToken);
             }
             catch (Exception ex)
             {
@@ -60,7 +65,10 @@ public static class CartEndpoints
             foreach (var item in items)
             {
                 var result = await catalog.SearchAsync(item.Query, 1, 5, cancellationToken);
-                var product = result.Items.FirstOrDefault(p => p.Available) ?? result.Items.FirstOrDefault();
+                // Faworyzujemy produkt pasujący do ulubionych (marka/nazwa), w obrębie dostępnych.
+                var available = result.Items.Where(p => p.Available).ToList();
+                var pool = available.Count > 0 ? available : result.Items.ToList();
+                var product = pool.FirstOrDefault(p => MatchesPreference(p, preferences)) ?? pool.FirstOrDefault();
                 if (product is not null)
                 {
                     cart.Add(product, item.Quantity);
@@ -188,5 +196,25 @@ public static class CartEndpoints
         .WithName("PushCartToFrisco");
 
         return app;
+    }
+
+    /// <summary>Czy produkt pasuje do którejś z preferencji (po nazwie lub marce, bez rozróżniania wielkości liter).</summary>
+    private static bool MatchesPreference(Product product, IReadOnlyList<string> preferences)
+    {
+        if (preferences.Count == 0)
+        {
+            return false;
+        }
+
+        foreach (var pref in preferences)
+        {
+            if (product.Name.Contains(pref, StringComparison.OrdinalIgnoreCase)
+                || (product.Brand is { } brand && brand.Contains(pref, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
