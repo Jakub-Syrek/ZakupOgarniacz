@@ -204,8 +204,8 @@ public sealed partial class FriscoAutoLogin
                     break;
                 }
 
-                // Okno otwarte już zalogowane → po ~4s wymuś reload, by sprowokować odnowienie tokenu.
-                if (!reloaded && elapsedSeconds >= 4 && !credentialMode)
+                // Okno otwarte już zalogowane → po ~3s wymuś reload, by sprowokować odnowienie tokenu.
+                if (!reloaded && elapsedSeconds >= 3 && !credentialMode)
                 {
                     reloaded = true;
                     try
@@ -216,6 +216,12 @@ public sealed partial class FriscoAutoLogin
                     {
                         // Reload może się nie udać (nawigacja) — nieistotne, lecimy dalej.
                     }
+                }
+
+                // Mamy już access-token z nagłówka i daliśmy reloadowi szansę na refresh — nie czekamy dłużej.
+                if (headerAccessToken is not null && elapsedSeconds >= 8)
+                {
+                    break;
                 }
 
                 await Task.Delay(1000, timeoutCts.Token);
