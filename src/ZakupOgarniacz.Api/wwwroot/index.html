@@ -54,6 +54,9 @@
 
   <div class="layout">
     <main>
+      <div class="note" style="margin-bottom:12px">
+        Napisz zwykłym językiem, co chcesz kupić — model <b>Claude Opus 4.8</b> (<code>claude-opus-4-8</code>) ułoży z tego listę i dobierze produkty z <b>realnej, aktualnej oferty Frisco.pl</b> (z cenami). Listę możesz potem poprawić ręcznie i wypchnąć koszyk do Frisco.
+      </div>
       <div class="row" style="margin-bottom:6px">
         <input id="cmd" class="qty" style="flex:1" placeholder="Powiedz, co kupić… np. 3 bochenki ciemnego pieczywa, czekoladę, pomarańcze, brzoskwinie i borówki">
         <button class="primary" id="cmdBtn">Wygeneruj koszyk</button>
@@ -74,25 +77,23 @@
 
       <hr style="border-color:var(--line); margin:16px 0">
       <h2>Auto-checkout (Frisco)</h2>
-      <div class="muted" style="margin-bottom:8px">Najłatwiej: kliknij poniżej, zaloguj się w oknie przeglądarki, a apka sama złapie token.</div>
-      <button id="autoLoginBtn" class="primary" style="width:100%;margin-bottom:10px">🔐 Zaloguj automatycznie (otwórz okno Frisco)</button>
-      <details style="margin-bottom:8px">
-        <summary class="muted" style="cursor:pointer">…albo wklej token ręcznie</summary>
-        <div class="muted" style="margin:8px 0">Wklej <b>refresh_token</b> z sesji Frisco (DevTools → Network → <code>POST /connect/token</code> → pole <code>refresh_token</code>). Apka sama mintuje i odnawia access-token. Trzymane tylko w pamięci.</div>
-      </details>
-      <input id="fUserId" class="qty" style="width:100%;margin-bottom:6px" placeholder="userId (np. 1831066)">
-      <input id="fRefresh" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="refresh_token (zalecane)">
-      <input id="fClientId" class="qty" style="width:100%;margin-bottom:6px" placeholder="client_id (domyślnie frisco-web)">
-      <input id="fToken" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="albo access_token (wygasa ~10 min)">
-      <div class="row">
-        <button id="saveTokenBtn" style="flex:1">Zapisz</button>
-        <button id="checkFriscoBtn" style="flex:1">Sprawdź koszyk Frisco</button>
-      </div>
-      <button id="pushFriscoBtn" class="primary" style="width:100%;margin-top:6px">Wrzuć nasz koszyk do Frisco →</button>
+      <div class="muted" style="margin-bottom:8px">Kliknij, zaloguj się w oknie przeglądarki, a apka sama złapie i będzie odnawiać token.</div>
+      <button id="autoLoginBtn" class="primary" style="width:100%;margin-bottom:6px">🔐 Zaloguj automatycznie (otwórz okno Frisco)</button>
+      <button id="checkFriscoBtn" style="width:100%;margin-bottom:6px">Sprawdź koszyk Frisco</button>
+      <button id="pushFriscoBtn" class="primary" style="width:100%">Wrzuć nasz koszyk do Frisco →</button>
       <div class="row" style="margin-top:6px">
         <input id="fPostcode" class="qty" style="flex:1" placeholder="kod pocztowy (np. 00-001)">
         <button id="deliveryBtn">Terminy dostawy</button>
       </div>
+      <details style="margin-top:10px">
+        <summary class="muted" style="cursor:pointer">…albo wklej token ręcznie (fallback)</summary>
+        <div class="muted" style="margin:8px 0">Gdyby auto-login zawiódł: wklej <b>refresh_token</b> z sesji Frisco (DevTools → Network → <code>POST /connect/token</code> → pole <code>refresh_token</code>). Trzymane tylko w pamięci.</div>
+        <input id="fUserId" class="qty" style="width:100%;margin-bottom:6px" placeholder="userId (np. 1831066)">
+        <input id="fRefresh" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="refresh_token (zalecane)">
+        <input id="fClientId" class="qty" style="width:100%;margin-bottom:6px" placeholder="client_id (domyślnie frisco-web)">
+        <input id="fToken" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="albo access_token (wygasa ~10 min)">
+        <button id="saveTokenBtn" style="width:100%">Zapisz token ręczny</button>
+      </details>
       <div id="friscoStatus" class="muted" style="margin-top:8px"></div>
       <pre id="friscoOut" style="display:none"></pre>
     </aside>
