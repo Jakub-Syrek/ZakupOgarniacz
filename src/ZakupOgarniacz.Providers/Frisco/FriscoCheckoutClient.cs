@@ -50,17 +50,10 @@ public sealed class FriscoCheckoutClient
     /// Wrzuca produkty do koszyka Frisco (batch <c>{ products: [{ productId, quantity }] }</c>).
     /// Zwraca status + ciało odpowiedzi (do relacji do UI). Granica: NIE płaci.
     /// </summary>
-    // Kandydaci metoda+ścieżka dla dodawania do koszyka (auto-detekcja — recon dał niejednoznaczność).
-    // 404/405 = zły route (nic nie zmienia) -> próbujemy następny; pierwszy inny wynik zwracamy.
-    private static readonly (HttpMethod Method, string Suffix)[] AddCandidates =
-    [
-        (HttpMethod.Post, "cart"),
-        (HttpMethod.Put, "cart"),
-        (HttpMethod.Patch, "cart"),
-        (HttpMethod.Post, "cart/products"),
-        (HttpMethod.Put, "cart/products"),
-    ];
-
+    /// <summary>
+    /// Wrzuca produkty do koszyka Frisco: <c>PUT users/{id}/cart</c> z
+    /// <c>{ products: [{ productId, quantity }] }</c> (potwierdzone reconem). Granica: NIE płaci.
+    /// </summary>
     public async Task<FriscoCartResult> AddProductsAsync(
         IReadOnlyCollection<(string ProductId, int Quantity)> items,
         CancellationToken cancellationToken = default)
@@ -74,29 +67,34 @@ public sealed class FriscoCheckoutClient
             products = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity }).ToArray(),
         };
 
-        FriscoCartResult? last = null;
-        foreach (var (method, suffix) in AddCandidates)
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"users/{creds.UserId}/cart")
         {
-            var route = $"{method.Method} users/{creds.UserId}/{suffix}";
-            using var request = new HttpRequestMessage(method, $"users/{creds.UserId}/{suffix}")
-            {
-                Content = JsonContent.Create(payload),
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
+            Content = JsonContent.Create(payload),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
 
-            using var response = await _http.SendAsync(request, cancellationToken);
-            var body = await response.Content.ReadAsStringAsync(cancellationToken);
-            var status = (int)response.StatusCode;
-            last = new FriscoCartResult(status, body, route);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        return new FriscoCartResult((int)response.StatusCode, body, $"PUT users/{creds.UserId}/cart");
+    }
 
-            // 404/405 = ten wariant nie istnieje/nie przyjmuje metody — próbuj dalej (nic nie dodano).
-            if (status is not (404 or 405))
-            {
-                return last;
-            }
-        }
+    /// <summary>
+    /// Read-proxy: autoryzowany GET na <c>users/{id}/{relativePath}</c> (np. <c>cart/saved-reservations</c>).
+    /// Zwraca status + ciało (bez rzucania) — narzędzie reconu endpointów (tylko odczyt).
+    /// </summary>
+    public async Task<FriscoCartResult> GetUserScopedRawAsync(string relativePath, CancellationToken cancellationToken = default)
+    {
+        var creds = _credentials.Snapshot()
+            ?? throw new InvalidOperationException("Brak skonfigurowanych poświadczeń Frisco.");
+        var accessToken = await GetAccessTokenAsync(creds, cancellationToken);
 
-        return last!;
+        var suffix = relativePath.TrimStart('/');
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"users/{creds.UserId}/{suffix}");
+        request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        return new FriscoCartResult((int)response.StatusCode, body, $"GET users/{creds.UserId}/{suffix}");
     }
 
     /// <summary>

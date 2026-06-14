@@ -87,6 +87,32 @@ app.MapGet("/frisco/delivery", async (string postcode, FriscoCheckoutClient clie
 .WithName("FriscoDelivery")
 .WithTags("FriscoCheckout");
 
+// Read-proxy (dev/recon): autoryzowany GET na users/{id}/{path}. Tylko odczyt.
+app.MapGet("/frisco/raw", async (string path, FriscoCheckoutClient client, CancellationToken cancellationToken) =>
+{
+    if (!client.IsConfigured)
+    {
+        return Results.Problem("Brak konfiguracji FriscoCheckout (token).", statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(path))
+    {
+        return Results.BadRequest(new { error = "Parametr 'path' jest wymagany." });
+    }
+
+    try
+    {
+        var result = await client.GetUserScopedRawAsync(path, cancellationToken);
+        return Results.Content(result.Body, "application/json", null, result.StatusCode);
+    }
+    catch (HttpRequestException ex)
+    {
+        return Results.Problem("Frisco: " + ex.Message, statusCode: 502);
+    }
+})
+.WithName("FriscoRaw")
+.WithTags("FriscoCheckout");
+
 // Poświadczenia edytowalne w locie (tylko w pamięci): refresh_token (zalecane) lub access-token.
 app.MapPost("/frisco/token", (SetFriscoTokenRequest request, FriscoCredentialStore store) =>
 {
