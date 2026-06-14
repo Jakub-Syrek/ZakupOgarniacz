@@ -22,6 +22,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// UI (statyczny SPA z wwwroot): "/" -> index.html.
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 // Health-check.
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
    .WithName("HealthCheck");
