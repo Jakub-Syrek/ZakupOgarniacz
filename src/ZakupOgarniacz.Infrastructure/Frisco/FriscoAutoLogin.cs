@@ -116,6 +116,7 @@ public sealed partial class FriscoAutoLogin
         var tokenTcs = new TaskCompletionSource<(string? Refresh, string? Access)>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         string? userId = null;
+        string? headerAccessToken = null;
 
         // Nasłuch tokenu/usera podpinamy do strony i do każdej NOWEJ karty/popupu (logowanie OAuth
         // bywa w osobnym oknie) — inaczej pojedynczy nasłuch przegapia token.
@@ -127,6 +128,13 @@ public sealed partial class FriscoAutoLogin
                 if (match.Success)
                 {
                     userId ??= match.Groups[1].Value;
+                }
+
+                // Fallback: gdy jesteś zalogowany, SPA i tak woła API z Authorization: Bearer.
+                if (headerAccessToken is null
+                    && request.Url.Contains("/commerce/api/", StringComparison.OrdinalIgnoreCase))
+                {
+                    _ = CaptureAuthHeaderAsync(request, token => headerAccessToken ??= token);
                 }
             };
 
@@ -163,9 +171,12 @@ public sealed partial class FriscoAutoLogin
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(_options.TimeoutMs);
 
-        // Pętla przechwytywania: token z /connect/token ALBO ze storage przeglądarki (token i tak
-        // tam ląduje, bo SPA Frisco go używa) — odpytujemy wszystkie karty co sekundę aż do skutku.
+        // Pętla przechwytywania (priorytet: refresh_token). Źródła: odpowiedź /connect/token,
+        // storage przeglądarki, a gdy okno otwiera się już zalogowane — wymuszamy reload, by
+        // sprowokować świeży /connect/token. Access-token z nagłówka to fallback (10 min, bez odnawiania).
         (string? Refresh, string? Access)? capture = null;
+        var reloaded = false;
+        var elapsedSeconds = 0;
         try
         {
             while (!timeoutCts.IsCancellationRequested)
@@ -193,7 +204,22 @@ public sealed partial class FriscoAutoLogin
                     break;
                 }
 
+                // Okno otwarte już zalogowane → po ~4s wymuś reload, by sprowokować odnowienie tokenu.
+                if (!reloaded && elapsedSeconds >= 4 && !credentialMode)
+                {
+                    reloaded = true;
+                    try
+                    {
+                        await page.ReloadAsync(new PageReloadOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+                    }
+                    catch
+                    {
+                        // Reload może się nie udać (nawigacja) — nieistotne, lecimy dalej.
+                    }
+                }
+
                 await Task.Delay(1000, timeoutCts.Token);
+                elapsedSeconds++;
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -201,11 +227,18 @@ public sealed partial class FriscoAutoLogin
             // Timeout — capture zostaje null, obsłużone niżej.
         }
 
+        // Fallback: access-token wyłuskany z nagłówka Authorization (gdy nie złapaliśmy refresh).
+        if (capture is null && !string.IsNullOrWhiteSpace(headerAccessToken))
+        {
+            capture = (null, headerAccessToken);
+            _logger.LogInformation("Auto-login Frisco: access-token z nagłówka Authorization (tryb access, ~10 min).");
+        }
+
         if (capture is null)
         {
             throw new FriscoLoginException(
-                "Nie przechwycono tokenu (minął limit czasu). Dokończ logowanie w oknie. Jeśli jesteś już " +
-                "zalogowany w tym oknie, odśwież stronę Frisco — token pojawi się w sesji i zostanie złapany.");
+                "Nie przechwycono tokenu (minął limit czasu). Jeśli jesteś już zalogowany w oknie, " +
+                "kliknij coś w sklepie Frisco (np. koszyk) — to wymusi żądanie z tokenem, który złapię.");
         }
 
         var (refresh, access) = capture.Value;
@@ -213,6 +246,27 @@ public sealed partial class FriscoAutoLogin
             ?? throw new FriscoLoginException("Przechwycono token, ale nie ustaliłem userId (z URL ani z JWT).");
 
         return (userId, refresh, access);
+    }
+
+    private static async Task CaptureAuthHeaderAsync(IRequest request, Action<string> onToken)
+    {
+        try
+        {
+            var headers = await request.AllHeadersAsync();
+            if (headers.TryGetValue("authorization", out var auth)
+                && auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                var token = auth["Bearer ".Length..].Trim();
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    onToken(token);
+                }
+            }
+        }
+        catch
+        {
+            // Best-effort: nagłówków czasem nie da się odczytać (żądanie już poszło).
+        }
     }
 
     private static async Task CaptureTokenAsync(IResponse response, TaskCompletionSource<(string?, string?)> tcs)
