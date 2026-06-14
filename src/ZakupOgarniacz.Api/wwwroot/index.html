@@ -67,6 +67,7 @@
       <h2>Koszyk</h2>
       <div id="cart"><div class="empty">Pusty</div></div>
       <div class="total"><span>Razem</span><span id="total">—</span></div>
+      <button id="clearCartBtn" style="width:100%;margin-bottom:6px" disabled>🗑️ Wyczyść koszyk</button>
       <button class="primary" id="exportBtn" style="width:100%" disabled>Przejdź do realizacji</button>
       <div class="note">Płatność i dostawę finalizujesz w Frisco — tu budujesz koszyk i eksportujesz go do realizacji.</div>
       <div id="exportOut"></div>
@@ -170,6 +171,18 @@
         : '<div class="empty">Pusty</div>';
       $("total").textContent = cart.total ? zl(cart.total) : (items.length ? "częściowo bez cen" : "—");
       $("exportBtn").disabled = items.length === 0;
+      $("clearCartBtn").disabled = items.length === 0;
+    }
+
+    async function clearCart() {
+      if (!cartId) return;
+      if (!confirm("Wyczyścić cały koszyk?")) return;
+      try {
+        await api(`/carts/${cartId}/clear`, { method: "POST" });
+        $("cmdOut").textContent = "";
+        $("exportOut").innerHTML = "";
+        await refreshCart();
+      } catch (e) { alert("Nie udało się wyczyścić: " + e.message); }
     }
 
     async function exportCart() {
@@ -230,6 +243,7 @@
 
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value.trim(); if (q) search(q); });
     $("exportBtn").addEventListener("click", exportCart);
+    $("clearCartBtn").addEventListener("click", clearCart);
     async function pushToFrisco() {
       if (!cartId) { $("friscoStatus").textContent = "Najpierw zbuduj koszyk."; return; }
       $("friscoOut").style.display = "none";

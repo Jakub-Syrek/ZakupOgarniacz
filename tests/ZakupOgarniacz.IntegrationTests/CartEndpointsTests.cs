@@ -50,6 +50,23 @@ public class CartEndpointsTests : IClassFixture<CatalogApiFactory>
     }
 
     [Fact]
+    public async Task Clear_oprozni_koszyk()
+    {
+        var client = _factory.CreateClient();
+        var cartId = await CreateCartAsync(client);
+        await client.PostAsJsonAsync($"/carts/{cartId}/items", new { code = "111", quantity = 2 });
+
+        var clear = await client.PostAsync($"/carts/{cartId}/clear", content: null);
+        Assert.Equal(HttpStatusCode.OK, clear.StatusCode);
+        var cart = await clear.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, cart.GetProperty("items").GetArrayLength());
+
+        var get = await client.GetAsync($"/carts/{cartId}");
+        var body = await get.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, body.GetProperty("items").GetArrayLength());
+    }
+
+    [Fact]
     public async Task Dodanie_nieznanego_produktu_zwraca_400()
     {
         var client = _factory.CreateClient();

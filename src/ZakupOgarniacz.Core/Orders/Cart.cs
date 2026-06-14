@@ -33,6 +33,9 @@ public sealed class Cart
         }
     }
 
+    /// <summary>Usuwa wszystkie pozycje z koszyka.</summary>
+    public void Clear() => _items.Clear();
+
     /// <summary>Suma wartości koszyka — <c>null</c>, jeśli któraś pozycja nie ma ceny.</summary>
     public Money? Total
     {

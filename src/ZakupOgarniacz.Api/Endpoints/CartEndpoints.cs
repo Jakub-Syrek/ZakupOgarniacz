@@ -117,6 +117,20 @@ public static class CartEndpoints
         })
         .WithName("AddCartItem");
 
+        group.MapPost("/{cartId}/clear", async (string cartId, ICartStore store, CancellationToken cancellationToken) =>
+        {
+            var cart = await store.GetAsync(cartId, cancellationToken);
+            if (cart is null)
+            {
+                return Results.NotFound();
+            }
+
+            cart.Clear();
+            await store.SaveAsync(cart, cancellationToken);
+            return Results.Ok(cart);
+        })
+        .WithName("ClearCart");
+
         group.MapPost("/{cartId}/export", async (
             string cartId,
             ICartStore store,
