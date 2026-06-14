@@ -4,8 +4,8 @@ using System.Text.Json.Serialization;
 
 namespace ZakupOgarniacz.Providers.Frisco;
 
-/// <summary>Wynik wywołania API Frisco (status + surowe ciało) do relacji do klienta UI.</summary>
-public sealed record FriscoCartResult(int StatusCode, string Body)
+/// <summary>Wynik wywołania API Frisco (status + surowe ciało + użyty wariant) do relacji do UI.</summary>
+public sealed record FriscoCartResult(int StatusCode, string Body, string? Route = null)
 {
     public bool IsSuccess => StatusCode is >= 200 and < 300;
 }
@@ -50,6 +50,17 @@ public sealed class FriscoCheckoutClient
     /// Wrzuca produkty do koszyka Frisco (batch <c>{ products: [{ productId, quantity }] }</c>).
     /// Zwraca status + ciało odpowiedzi (do relacji do UI). Granica: NIE płaci.
     /// </summary>
+    // Kandydaci metoda+ścieżka dla dodawania do koszyka (auto-detekcja — recon dał niejednoznaczność).
+    // 404/405 = zły route (nic nie zmienia) -> próbujemy następny; pierwszy inny wynik zwracamy.
+    private static readonly (HttpMethod Method, string Suffix)[] AddCandidates =
+    [
+        (HttpMethod.Post, "cart"),
+        (HttpMethod.Put, "cart"),
+        (HttpMethod.Patch, "cart"),
+        (HttpMethod.Post, "cart/products"),
+        (HttpMethod.Put, "cart/products"),
+    ];
+
     public async Task<FriscoCartResult> AddProductsAsync(
         IReadOnlyCollection<(string ProductId, int Quantity)> items,
         CancellationToken cancellationToken = default)
@@ -63,15 +74,29 @@ public sealed class FriscoCheckoutClient
             products = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity }).ToArray(),
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"users/{creds.UserId}/cart/products")
+        FriscoCartResult? last = null;
+        foreach (var (method, suffix) in AddCandidates)
         {
-            Content = JsonContent.Create(payload),
-        };
-        request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
+            var route = $"{method.Method} users/{creds.UserId}/{suffix}";
+            using var request = new HttpRequestMessage(method, $"users/{creds.UserId}/{suffix}")
+            {
+                Content = JsonContent.Create(payload),
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
 
-        using var response = await _http.SendAsync(request, cancellationToken);
-        var body = await response.Content.ReadAsStringAsync(cancellationToken);
-        return new FriscoCartResult((int)response.StatusCode, body);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            var status = (int)response.StatusCode;
+            last = new FriscoCartResult(status, body, route);
+
+            // 404/405 = ten wariant nie istnieje/nie przyjmuje metody — próbuj dalej (nic nie dodano).
+            if (status is not (404 or 405))
+            {
+                return last;
+            }
+        }
+
+        return last!;
     }
 
     /// <summary>

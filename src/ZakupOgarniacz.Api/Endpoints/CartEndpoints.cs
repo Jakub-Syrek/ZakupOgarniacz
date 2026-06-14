@@ -106,7 +106,7 @@ public static class CartEndpoints
             {
                 var result = await frisco.AddProductsAsync(items, cancellationToken);
                 return Results.Json(
-                    new { friscoStatus = result.StatusCode, ok = result.IsSuccess, count = items.Count },
+                    new { friscoStatus = result.StatusCode, ok = result.IsSuccess, count = items.Count, route = result.Route },
                     statusCode: result.IsSuccess ? 200 : 502);
             }
             catch (Exception ex)
