@@ -41,11 +41,53 @@
     .note { font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:12px; }
     pre { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:12px; max-height:220px; overflow:auto; }
     .empty { color:var(--muted); padding:40px; text-align:center; }
+    /* --- logo / branding (szmery-bajery) --- */
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { position:relative; width:44px; height:44px; flex:0 0 auto; }
+    .logo svg { width:44px; height:44px; display:block; filter:drop-shadow(0 3px 10px rgba(47,129,247,.5)); }
+    .logo::before { content:""; position:absolute; inset:-5px; border-radius:16px; z-index:-1; filter:blur(11px); opacity:.55;
+      background:conic-gradient(from 0deg, var(--accent), var(--accent2), #a371f7, var(--accent)); animation:spin 7s linear infinite; }
+    .wordmark { display:flex; flex-direction:column; line-height:1.05; }
+    .title { font-size:20px; font-weight:800; margin:0; letter-spacing:-.2px; white-space:nowrap;
+      background:linear-gradient(90deg,#e8ecf1,#9fd0ff 38%,#8affc1 66%,#e8ecf1); background-size:220% auto;
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+      animation:sheen 6s linear infinite; }
+    .tag { font-size:10.5px; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; margin-top:2px; }
+    .spark { transform-box:fill-box; transform-origin:center; animation:twinkle 2.6s ease-in-out infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    @keyframes sheen { to { background-position:220% center; } }
+    @keyframes twinkle { 0%,100% { opacity:.55; transform:scale(.78) rotate(0); } 50% { opacity:1; transform:scale(1.18) rotate(18deg); } }
+    @media (prefers-reduced-motion: reduce) { .logo::before, .title, .spark { animation:none; } }
   </style>
 </head>
 <body>
   <header>
-    <h1>🛒 ZakupOgarniacz <span class="sub">· Frisco</span></h1>
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZakupOgarniacz">
+          <defs>
+            <linearGradient id="zg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#3fb950"/>
+              <stop offset="1" stop-color="#2f81f7"/>
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="40" height="40" rx="12" fill="url(#zg)"/>
+          <rect x="2" y="2" width="40" height="20" rx="12" fill="#fff" opacity=".12"/>
+          <g transform="translate(8,8.5)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            <circle cx="9" cy="21" r="1.7" fill="#fff" stroke="none"/>
+            <circle cx="20" cy="21" r="1.7" fill="#fff" stroke="none"/>
+          </g>
+          <g class="spark">
+            <path d="M32 8.5l1.3 3.4 3.4 1.3-3.4 1.3-1.3 3.4-1.3-3.4-3.4-1.3 3.4-1.3z" fill="#fff"/>
+          </g>
+        </svg>
+      </span>
+      <div class="wordmark">
+        <h1 class="title">ZakupOgarniacz</h1>
+        <span class="tag">AI zakupy · Frisco.pl</span>
+      </div>
+    </div>
     <form class="search" id="searchForm">
       <input id="q" placeholder="Szukaj produktu (np. mleko, masło, chleb)…" autocomplete="off" />
       <button class="primary" type="submit">Szukaj</button>
