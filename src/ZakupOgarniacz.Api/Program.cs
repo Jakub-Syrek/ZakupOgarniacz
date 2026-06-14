@@ -61,6 +61,32 @@ app.MapGet("/frisco/cart", async (FriscoCheckoutClient client, CancellationToken
 .WithName("FriscoCartRaw")
 .WithTags("FriscoCheckout");
 
+// Terminy dostawy + opcje płatności dla kodu pocztowego (odczyt; pod wybór slotu).
+app.MapGet("/frisco/delivery", async (string postcode, FriscoCheckoutClient client, CancellationToken cancellationToken) =>
+{
+    if (!client.IsConfigured)
+    {
+        return Results.Problem("Brak konfiguracji FriscoCheckout (token).", statusCode: 503);
+    }
+
+    if (string.IsNullOrWhiteSpace(postcode))
+    {
+        return Results.BadRequest(new { error = "Parametr 'postcode' jest wymagany." });
+    }
+
+    try
+    {
+        var json = await client.GetDeliveryPaymentRawAsync(postcode, cancellationToken);
+        return Results.Content(json, "application/json");
+    }
+    catch (HttpRequestException ex)
+    {
+        return Results.Problem("Frisco: " + ex.Message, statusCode: 502);
+    }
+})
+.WithName("FriscoDelivery")
+.WithTags("FriscoCheckout");
+
 // Poświadczenia edytowalne w locie (tylko w pamięci): refresh_token (zalecane) lub access-token.
 app.MapPost("/frisco/token", (SetFriscoTokenRequest request, FriscoCredentialStore store) =>
 {

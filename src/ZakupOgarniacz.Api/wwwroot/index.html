@@ -78,6 +78,10 @@
         <button id="checkFriscoBtn" style="flex:1">Sprawdź koszyk Frisco</button>
       </div>
       <button id="pushFriscoBtn" class="primary" style="width:100%;margin-top:6px">Wrzuć nasz koszyk do Frisco →</button>
+      <div class="row" style="margin-top:6px">
+        <input id="fPostcode" class="qty" style="flex:1" placeholder="kod pocztowy (np. 00-001)">
+        <button id="deliveryBtn">Terminy dostawy</button>
+      </div>
       <div id="friscoStatus" class="muted" style="margin-top:8px"></div>
       <pre id="friscoOut" style="display:none"></pre>
     </aside>
@@ -210,9 +214,22 @@
       } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
     }
 
+    async function loadDelivery() {
+      const pc = $("fPostcode").value.trim();
+      if (!pc) { $("friscoStatus").textContent = "Podaj kod pocztowy."; return; }
+      $("friscoOut").style.display = "none";
+      try {
+        const r = await fetch("/frisco/delivery?postcode=" + encodeURIComponent(pc));
+        const txt = await r.text();
+        $("friscoStatus").textContent = "Terminy dostawy → HTTP " + r.status;
+        $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 1500);
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
     $("saveTokenBtn").addEventListener("click", saveToken);
     $("checkFriscoBtn").addEventListener("click", checkFrisco);
     $("pushFriscoBtn").addEventListener("click", pushToFrisco);
+    $("deliveryBtn").addEventListener("click", loadDelivery);
 
     // start
     refreshCart();

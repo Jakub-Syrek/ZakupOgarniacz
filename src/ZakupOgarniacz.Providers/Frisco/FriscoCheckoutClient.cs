@@ -74,6 +74,25 @@ public sealed class FriscoCheckoutClient
         return new FriscoCartResult((int)response.StatusCode, body);
     }
 
+    /// <summary>
+    /// Pobiera surowy JSON terminów dostawy + opcji płatności dla kodu pocztowego
+    /// (<c>GET users/{id}/calendar/delivery-payment?postcode=…</c>). Tylko odczyt.
+    /// </summary>
+    public async Task<string> GetDeliveryPaymentRawAsync(string postcode, CancellationToken cancellationToken = default)
+    {
+        var creds = _credentials.Snapshot()
+            ?? throw new InvalidOperationException("Brak skonfigurowanych poświadczeń Frisco.");
+        var accessToken = await GetAccessTokenAsync(creds, cancellationToken);
+
+        var path = $"users/{creds.UserId}/calendar/delivery-payment?postcode={Uri.EscapeDataString(postcode)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, path);
+        request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
     private async Task<string> GetAccessTokenAsync(FriscoCredentials creds, CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
