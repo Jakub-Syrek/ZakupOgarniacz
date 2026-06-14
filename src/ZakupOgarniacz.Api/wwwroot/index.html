@@ -54,6 +54,11 @@
 
   <div class="layout">
     <main>
+      <div class="row" style="margin-bottom:6px">
+        <input id="cmd" class="qty" style="flex:1" placeholder="Powiedz, co kupić… np. 3 bochenki ciemnego pieczywa, czekoladę, pomarańcze, brzoskwinie i borówki">
+        <button class="primary" id="cmdBtn">Wygeneruj koszyk</button>
+      </div>
+      <div id="cmdOut" class="muted" style="margin-bottom:10px"></div>
       <div id="status" class="muted"></div>
       <div id="grid" class="grid"></div>
     </main>
@@ -200,6 +205,28 @@
         $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 1500);
       } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
     }
+
+    async function fromCommand() {
+      const command = $("cmd").value.trim();
+      if (!command) return;
+      $("cmdOut").textContent = "Generuję listę…";
+      try {
+        const r = await fetch("/carts/from-command", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command, cartId: cartId || undefined })
+        });
+        if (r.status === 503) { $("cmdOut").textContent = "Parser niedostępny: ustaw klucz Anthropic API (ANTHROPIC_API_KEY)."; return; }
+        if (!r.ok) { $("cmdOut").textContent = "Błąd: HTTP " + r.status; return; }
+        const data = await r.json();
+        cartId = data.cartId; localStorage.setItem("cartId", cartId);
+        $("cmdOut").innerHTML = (data.report || []).map(x => x.matched
+          ? `<span style="color:var(--accent)">✓ ${x.query} ×${x.quantity}</span> → ${x.matched}`
+          : `<span style="color:var(--warn)">✗ ${x.query} — nie znaleziono</span>`).join(" &nbsp;•&nbsp; ");
+        await refreshCart();
+      } catch (e) { $("cmdOut").textContent = "Błąd: " + e.message; }
+    }
+    $("cmdBtn").addEventListener("click", fromCommand);
+    $("cmd").addEventListener("keydown", (e) => { if (e.key === "Enter") fromCommand(); });
 
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value.trim(); if (q) search(q); });
     $("exportBtn").addEventListener("click", exportCart);

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using ZakupOgarniacz.Core.Catalog;
 using ZakupOgarniacz.Core.Orders;
+using ZakupOgarniacz.Core.Shopping;
 using ZakupOgarniacz.Infrastructure.Orders;
 using ZakupOgarniacz.IntegrationTests.TestDoubles;
 
@@ -25,6 +26,10 @@ public sealed class CatalogApiFactory : WebApplicationFactory<Program>
             // Koszyk in-memory zamiast SQLite — izolacja i brak plików DB w testach.
             services.RemoveAll<ICartStore>();
             services.AddSingleton<ICartStore, InMemoryCartStore>();
+
+            // Atrapa parsera zamiast Claude — bez klucza API i bez wołania LLM.
+            services.RemoveAll<IShoppingListParser>();
+            services.AddSingleton<IShoppingListParser, FakeShoppingListParser>();
         });
     }
 }

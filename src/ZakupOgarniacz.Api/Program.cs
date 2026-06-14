@@ -16,6 +16,9 @@ builder.Services.AddSqliteCartStore(
 // Zalogowany klient Frisco (auto-checkout do ekranu płatności) — token z konfiguracji.
 builder.Services.AddFriscoCheckout(builder.Configuration);
 
+// Parser poleceń w naturalnym języku → lista zakupów (Claude).
+builder.Services.AddClaudeShoppingParser(builder.Configuration);
+
 var app = builder.Build();
 
 // Pipeline HTTP.

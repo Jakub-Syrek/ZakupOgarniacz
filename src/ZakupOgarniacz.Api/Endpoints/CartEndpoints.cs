@@ -1,5 +1,6 @@
 using ZakupOgarniacz.Core.Catalog;
 using ZakupOgarniacz.Core.Orders;
+using ZakupOgarniacz.Core.Shopping;
 using ZakupOgarniacz.Providers.Frisco;
 
 namespace ZakupOgarniacz.Api.Endpoints;
@@ -9,6 +10,9 @@ public static class CartEndpoints
 {
     /// <summary>Żądanie dodania pozycji do koszyka.</summary>
     public sealed record AddItemRequest(string Code, int Quantity = 1);
+
+    /// <summary>Żądanie zbudowania koszyka z polecenia w naturalnym języku.</summary>
+    public sealed record FromCommandRequest(string Command, string? CartId);
 
     public static IEndpointRouteBuilder MapCartEndpoints(this IEndpointRouteBuilder app)
     {
@@ -20,6 +24,59 @@ public static class CartEndpoints
         })
         .WithTags("Cart")
         .WithName("CreateCart");
+
+        // Polecenie w naturalnym języku → parsowanie (Claude) → wyszukanie w katalogu → koszyk.
+        app.MapPost("/carts/from-command", async (
+            FromCommandRequest request,
+            IShoppingListParser parser,
+            ICatalogProvider catalog,
+            ICartStore store,
+            CancellationToken cancellationToken) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Command))
+            {
+                return Results.BadRequest(new { error = "Pole 'command' jest wymagane." });
+            }
+
+            if (!parser.IsConfigured)
+            {
+                return Results.Problem("Brak klucza Anthropic API (sekcja Claude / ANTHROPIC_API_KEY).", statusCode: 503);
+            }
+
+            IReadOnlyList<ShoppingItem> items;
+            try
+            {
+                items = await parser.ParseAsync(request.Command, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem("Parser: " + ex.Message, statusCode: 502);
+            }
+
+            var cart = (request.CartId is { } id ? await store.GetAsync(id, cancellationToken) : null)
+                       ?? await store.CreateAsync(cancellationToken);
+
+            var report = new List<object>();
+            foreach (var item in items)
+            {
+                var result = await catalog.SearchAsync(item.Query, 1, 5, cancellationToken);
+                var product = result.Items.FirstOrDefault(p => p.Available) ?? result.Items.FirstOrDefault();
+                if (product is not null)
+                {
+                    cart.Add(product, item.Quantity);
+                    report.Add(new { query = item.Query, quantity = item.Quantity, matched = product.Name, productId = product.Id, price = product.Price });
+                }
+                else
+                {
+                    report.Add(new { query = item.Query, quantity = item.Quantity, matched = (string?)null });
+                }
+            }
+
+            await store.SaveAsync(cart, cancellationToken);
+            return Results.Ok(new { cartId = cart.Id, cart, report });
+        })
+        .WithTags("Cart")
+        .WithName("CartFromCommand");
 
         var group = app.MapGroup("/carts").WithTags("Cart");
 

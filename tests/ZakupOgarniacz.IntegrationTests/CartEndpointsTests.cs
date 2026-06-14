@@ -69,4 +69,23 @@ public class CartEndpointsTests : IClassFixture<CatalogApiFactory>
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task FromCommand_buduje_koszyk_z_polecenia()
+    {
+        var client = _factory.CreateClient();
+
+        // atrapa parsera zwraca [("mleko", 2)]; atrapa katalogu mapuje to na produkt 111 (6,99)
+        var response = await client.PostAsJsonAsync("/carts/from-command", new { command = "kup mi mleko" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        var items = body.GetProperty("cart").GetProperty("items");
+        Assert.Equal(1, items.GetArrayLength());
+        Assert.Equal(2, items[0].GetProperty("quantity").GetInt32());
+        Assert.Equal(13.98m, body.GetProperty("cart").GetProperty("total").GetProperty("amount").GetDecimal());
+
+        Assert.Equal("Mleko UHT 2% Łaciate 1 l", body.GetProperty("report")[0].GetProperty("matched").GetString());
+    }
 }
