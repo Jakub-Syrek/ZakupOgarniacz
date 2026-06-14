@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using ZakupOgarniacz.Core.Catalog;
@@ -33,6 +34,35 @@ public static class FriscoServiceCollectionExtensions
         .AddStandardResilienceHandler();
 
         services.AddSingleton<IOrderProvider, FriscoOrderProvider>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Rejestruje zalogowanego klienta Frisco (<see cref="FriscoCheckoutClient"/>) do auto-checkoutu.
+    /// Token i userId pochodzą z konfiguracji (sekcja <c>FriscoCheckout</c>; trzymaj je w
+    /// user-secrets / zmiennych środowiskowych, nie w wersjonowanym appsettings).
+    /// </summary>
+    public static IServiceCollection AddFriscoCheckout(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<FriscoCheckoutOptions>(configuration.GetSection(FriscoCheckoutOptions.SectionName));
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FriscoCheckoutOptions>>().Value);
+
+        services.AddHttpClient<FriscoCheckoutClient>(static (serviceProvider, client) =>
+        {
+            var options = serviceProvider.GetRequiredService<FriscoCheckoutOptions>();
+            client.BaseAddress = new Uri(options.BaseUrl);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ZakupOgarniacz/0.1)");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+            if (options.IsConfigured)
+            {
+                client.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue(options.AuthScheme, options.AccessToken);
+            }
+        })
+        .AddStandardResilienceHandler();
 
         return services;
     }
