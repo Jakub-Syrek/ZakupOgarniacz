@@ -77,6 +77,7 @@
         <button id="saveTokenBtn" style="flex:1">Zapisz</button>
         <button id="checkFriscoBtn" style="flex:1">Sprawdź koszyk Frisco</button>
       </div>
+      <button id="pushFriscoBtn" class="primary" style="width:100%;margin-top:6px">Wrzuć nasz koszyk do Frisco →</button>
       <div id="friscoStatus" class="muted" style="margin-top:8px"></div>
       <pre id="friscoOut" style="display:none"></pre>
     </aside>
@@ -198,8 +199,20 @@
 
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value.trim(); if (q) search(q); });
     $("exportBtn").addEventListener("click", exportCart);
+    async function pushToFrisco() {
+      if (!cartId) { $("friscoStatus").textContent = "Najpierw zbuduj koszyk."; return; }
+      $("friscoOut").style.display = "none";
+      try {
+        const r = await fetch(`/carts/${cartId}/push-to-frisco`, { method: "POST" });
+        const txt = await r.text();
+        $("friscoStatus").textContent = "Push → HTTP " + r.status + (r.ok ? " ✓ — dokończ dostawę i płatność w Frisco" : "");
+        $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 800);
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
     $("saveTokenBtn").addEventListener("click", saveToken);
     $("checkFriscoBtn").addEventListener("click", checkFrisco);
+    $("pushFriscoBtn").addEventListener("click", pushToFrisco);
 
     // start
     refreshCart();

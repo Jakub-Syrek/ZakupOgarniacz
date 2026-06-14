@@ -1,5 +1,6 @@
 using ZakupOgarniacz.Core.Catalog;
 using ZakupOgarniacz.Core.Orders;
+using ZakupOgarniacz.Providers.Frisco;
 
 namespace ZakupOgarniacz.Api.Endpoints;
 
@@ -75,6 +76,45 @@ public static class CartEndpoints
             return Results.Ok(export);
         })
         .WithName("ExportCart");
+
+        // Auto-checkout (etap): wrzuca pozycje naszego koszyka do koszyka Frisco (po tokenie).
+        // Granica: NIE realizuje płatności — to robisz w Frisco.
+        group.MapPost("/{cartId}/push-to-frisco", async (
+            string cartId,
+            ICartStore store,
+            FriscoCheckoutClient frisco,
+            CancellationToken cancellationToken) =>
+        {
+            if (!frisco.IsConfigured)
+            {
+                return Results.Problem("Brak poświadczeń Frisco (ustaw token w sekcji Auto-checkout).", statusCode: 503);
+            }
+
+            var cart = await store.GetAsync(cartId, cancellationToken);
+            if (cart is null)
+            {
+                return Results.NotFound();
+            }
+
+            if (cart.Items.Count == 0)
+            {
+                return Results.BadRequest(new { error = "Koszyk jest pusty." });
+            }
+
+            var items = cart.Items.Select(i => (i.Product.Id, i.Quantity)).ToList();
+            try
+            {
+                var result = await frisco.AddProductsAsync(items, cancellationToken);
+                return Results.Json(
+                    new { friscoStatus = result.StatusCode, ok = result.IsSuccess, count = items.Count },
+                    statusCode: result.IsSuccess ? 200 : 502);
+            }
+            catch (Exception ex)
+            {
+                return Results.Problem("Push do Frisco: " + ex.Message, statusCode: 502);
+            }
+        })
+        .WithName("PushCartToFrisco");
 
         return app;
     }

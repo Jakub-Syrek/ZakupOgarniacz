@@ -4,6 +4,12 @@ using System.Text.Json.Serialization;
 
 namespace ZakupOgarniacz.Providers.Frisco;
 
+/// <summary>Wynik wywołania API Frisco (status + surowe ciało) do relacji do klienta UI.</summary>
+public sealed record FriscoCartResult(int StatusCode, string Body)
+{
+    public bool IsSuccess => StatusCode is >= 200 and < 300;
+}
+
 /// <summary>
 /// Zalogowany klient Frisco do auto-checkoutu (do ekranu płatności). Sam dba o ważny
 /// access-token: cache → odświeżenie przez OAuth2 <c>refresh_token</c> na
@@ -38,6 +44,34 @@ public sealed class FriscoCheckoutClient
         using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Wrzuca produkty do koszyka Frisco (batch <c>{ products: [{ productId, quantity }] }</c>).
+    /// Zwraca status + ciało odpowiedzi (do relacji do UI). Granica: NIE płaci.
+    /// </summary>
+    public async Task<FriscoCartResult> AddProductsAsync(
+        IReadOnlyCollection<(string ProductId, int Quantity)> items,
+        CancellationToken cancellationToken = default)
+    {
+        var creds = _credentials.Snapshot()
+            ?? throw new InvalidOperationException("Brak skonfigurowanych poświadczeń Frisco.");
+        var accessToken = await GetAccessTokenAsync(creds, cancellationToken);
+
+        var payload = new
+        {
+            products = items.Select(i => new { productId = i.ProductId, quantity = i.Quantity }).ToArray(),
+        };
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"users/{creds.UserId}/cart/products")
+        {
+            Content = JsonContent.Create(payload),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, accessToken);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        return new FriscoCartResult((int)response.StatusCode, body);
     }
 
     private async Task<string> GetAccessTokenAsync(FriscoCredentials creds, CancellationToken cancellationToken)
