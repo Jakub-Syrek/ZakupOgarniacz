@@ -34,7 +34,10 @@
     .badge.no { color:var(--warn); border-color:var(--warn); }
     aside { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; position:sticky; top:78px; }
     aside h2 { font-size:15px; margin:0 0 10px; }
-    .citem { display:flex; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+    .citem { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); font-size:11.5px; }
+    .citem .cthumb { width:34px; height:34px; flex:0 0 auto; object-fit:contain; background:#fff; border-radius:6px; display:inline-block; }
+    .citem .cname { flex:1; line-height:1.25; }
+    .citem .cprice { white-space:nowrap; font-weight:600; }
     .citem .q { color:var(--muted); }
     .total { display:flex; justify-content:space-between; font-weight:700; margin:12px 0; font-size:16px; }
     .muted { color:var(--muted); font-size:12px; }
@@ -215,7 +218,10 @@
       catch { localStorage.removeItem("cartId"); cartId = null; return; }
       const items = cart.items || [];
       $("cart").innerHTML = items.length
-        ? items.map(i => `<div class="citem"><span>${i.product.name} <span class="q">×${i.quantity}</span></span><span>${zl(i.lineTotal)}</span></div>`).join("")
+        ? items.map(i => {
+            const t = i.product.imageUrl ? `<img class="cthumb" src="${i.product.imageUrl}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="cthumb"></span>`;
+            return `<div class="citem">${t}<span class="cname">${i.product.name} <span class="q">×${i.quantity}</span></span><span class="cprice">${zl(i.lineTotal)}</span></div>`;
+          }).join("")
         : '<div class="empty">Pusty</div>';
       $("total").textContent = cart.total ? zl(cart.total) : (items.length ? "częściowo bez cen" : "—");
       $("exportBtn").disabled = items.length === 0;
