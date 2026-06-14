@@ -114,11 +114,16 @@ public sealed class ClaudeShoppingListParser : IShoppingListParser
 
         var list = string.Join("\n", favourites.Select(p => "- " + p));
         return SystemPrompt + "\n\n" + $"""
-            Preferencje użytkownika (ULUBIONE — traktuj PRIORYTETOWO, większa waga przy wyborze):
+            Preferencje i nastawienie użytkownika (traktuj PRIORYTETOWO):
             {list}
-            Gdy któraś preferencja pasuje do pozycji (marka, rodzaj, konkretny produkt), wpleć ją w `query`
-            (np. ulubiona marka mleka => „mleko <marka>"). Jeśli polecenie jest ogólne (np. „zrób zakupy na tydzień"),
-            chętniej uwzględniaj ulubione. Nie dodawaj ulubionych, które nie pasują do polecenia.
+            Rozróżnij dwa rodzaje preferencji:
+            1) Konkretne ulubione (marka/produkt, np. „Łaciate", „tofu") — preferuj je i wpleć w `query`
+               (np. ulubiona marka mleka => „mleko Łaciate"), gdy pasują do polecenia.
+            2) Wysokopoziomowe predyspozycje (dieta / zdrowie / budżet / wartości / smak — np. „wegetarianin",
+               „bez laktozy", „dużo białka", „tanio", „eko", „bez cukru") — stosuj jako ZASADĘ do CAŁEJ listy:
+               dobieraj pozycje z nimi zgodne, a niezgodne pomijaj lub zastępuj (np. „wegetarianin" => bez mięsa;
+               „bez laktozy" => warianty bez laktozy). Możesz doprecyzować `query` zgodnie z predyspozycją.
+            Nie dodawaj pozycji, które nie wynikają ani z polecenia, ani z preferencji.
             """;
     }
 
