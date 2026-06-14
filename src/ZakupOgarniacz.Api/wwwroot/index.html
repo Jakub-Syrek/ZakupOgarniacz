@@ -39,6 +39,7 @@
     .citem .cname { flex:1; line-height:1.25; }
     .citem .cprice { white-space:nowrap; font-weight:600; }
     .citem .q { color:var(--muted); }
+    #cart { max-height:48vh; overflow-y:auto; }
     .total { display:flex; justify-content:space-between; font-weight:700; margin:12px 0; font-size:16px; }
     .muted { color:var(--muted); font-size:12px; }
     .note { font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:12px; }
@@ -232,6 +233,7 @@
             return `<div class="citem">${t}<span class="cname">${i.product.name} <span class="q">×${i.quantity}</span></span><span class="cprice">${zl(i.lineTotal)}</span></div>`;
           }).join("")
         : '<div class="empty">Pusty</div>';
+      $("cart").scrollTop = 0;
       $("total").textContent = cart.total ? zl(cart.total) : (items.length ? "częściowo bez cen" : "—");
       $("exportBtn").disabled = items.length === 0;
       $("clearCartBtn").disabled = items.length === 0;
