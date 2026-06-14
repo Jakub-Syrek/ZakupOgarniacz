@@ -65,6 +65,19 @@
       <button class="primary" id="exportBtn" style="width:100%" disabled>Przejdź do realizacji</button>
       <div class="note">Płatność i dostawę finalizujesz w Frisco — tu budujesz koszyk i eksportujesz go do realizacji.</div>
       <div id="exportOut"></div>
+
+      <hr style="border-color:var(--line); margin:16px 0">
+      <h2>Auto-checkout (Frisco)</h2>
+      <div class="muted" style="margin-bottom:8px">Wklej token z sesji Frisco (DevTools → Network → nagłówek Authorization). Trzymany tylko w pamięci aplikacji; możesz go odświeżyć, gdy wygaśnie.</div>
+      <input id="fUserId" class="qty" style="width:100%;margin-bottom:6px" placeholder="userId (np. 1831066)">
+      <input id="fToken" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="token">
+      <input id="fScheme" class="qty" style="width:100%;margin-bottom:6px" placeholder="schemat (domyślnie Bearer)">
+      <div class="row">
+        <button id="saveTokenBtn" style="flex:1">Zapisz token</button>
+        <button id="checkFriscoBtn" style="flex:1">Sprawdź koszyk Frisco</button>
+      </div>
+      <div id="friscoStatus" class="muted" style="margin-top:8px"></div>
+      <pre id="friscoOut" style="display:none"></pre>
     </aside>
   </div>
 
@@ -155,11 +168,37 @@
       $("exportOut").innerHTML = `<div class="muted" style="margin-top:10px">Lista do realizacji w Frisco:</div><pre>${lines || "(pusto)"}</pre>`;
     }
 
+    async function loadFriscoStatus() {
+      try { const s = await api("/frisco/token/status"); $("friscoStatus").textContent = s.configured ? "Token: ustawiony ✓" : "Token: brak"; } catch {}
+    }
+
+    async function saveToken() {
+      const userId = $("fUserId").value.trim(), accessToken = $("fToken").value.trim(), authScheme = $("fScheme").value.trim() || undefined;
+      if (!userId || !accessToken) { $("friscoStatus").textContent = "Podaj userId i token."; return; }
+      try {
+        await api("/frisco/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, accessToken, authScheme }) });
+        $("fToken").value = ""; $("friscoStatus").textContent = "Token zapisany ✓";
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
+    async function checkFrisco() {
+      $("friscoOut").style.display = "none";
+      try {
+        const r = await fetch("/frisco/cart");
+        const txt = await r.text();
+        $("friscoStatus").textContent = "GET /frisco/cart → HTTP " + r.status + (r.ok ? " ✓" : "");
+        $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 1500);
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
     $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value.trim(); if (q) search(q); });
     $("exportBtn").addEventListener("click", exportCart);
+    $("saveTokenBtn").addEventListener("click", saveToken);
+    $("checkFriscoBtn").addEventListener("click", checkFrisco);
 
     // start
     refreshCart();
+    loadFriscoStatus();
     search("mleko");
   </script>
 </body>

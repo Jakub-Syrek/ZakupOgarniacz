@@ -1,4 +1,3 @@
-using System.Net.Http.Headers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using ZakupOgarniacz.Core.Catalog;
@@ -50,17 +49,15 @@ public static class FriscoServiceCollectionExtensions
         services.Configure<FriscoCheckoutOptions>(configuration.GetSection(FriscoCheckoutOptions.SectionName));
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<FriscoCheckoutOptions>>().Value);
 
+        // Token edytowalny w locie (seedowany z configu) — używany per żądanie przez klienta.
+        services.AddSingleton<FriscoCredentialStore>();
+
         services.AddHttpClient<FriscoCheckoutClient>(static (serviceProvider, client) =>
         {
             var options = serviceProvider.GetRequiredService<FriscoCheckoutOptions>();
             client.BaseAddress = new Uri(options.BaseUrl);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ZakupOgarniacz/0.1)");
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-            if (options.IsConfigured)
-            {
-                client.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue(options.AuthScheme, options.AccessToken);
-            }
         })
         .AddStandardResilienceHandler();
 

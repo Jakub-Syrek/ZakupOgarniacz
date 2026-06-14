@@ -1,31 +1,39 @@
+using System.Net.Http.Headers;
+
 namespace ZakupOgarniacz.Providers.Frisco;
 
 /// <summary>
-/// Zalogowany klient Frisco do auto-checkoutu (do ekranu płatności). Używa tokena
-/// z konfiguracji (<see cref="FriscoCheckoutOptions"/>) i user-scoped endpointów
-/// <c>/users/{id}/cart…</c>. Granica: NIE wykonuje płatności.
+/// Zalogowany klient Frisco do auto-checkoutu (do ekranu płatności). Token bierze z
+/// <see cref="FriscoCredentialStore"/> (edytowalny w locie) i ustawia nagłówek autoryzacji
+/// per żądanie. Granica: NIE wykonuje płatności.
 /// </summary>
 /// <remarks>
 /// Payloady (<c>POST /cart/products</c>, rezerwacja dostawy, <c>cart/order</c>) zostaną
-/// uzupełnione po przechwyceniu realnych żądań z DevTools — patrz metody z TODO.
+/// uzupełnione po przechwyceniu realnych żądań z DevTools — patrz TODO.
 /// </remarks>
 public sealed class FriscoCheckoutClient
 {
     private readonly HttpClient _http;
-    private readonly FriscoCheckoutOptions _options;
+    private readonly FriscoCredentialStore _credentials;
 
-    public FriscoCheckoutClient(HttpClient http, FriscoCheckoutOptions options)
+    public FriscoCheckoutClient(HttpClient http, FriscoCredentialStore credentials)
     {
         _http = http;
-        _options = options;
+        _credentials = credentials;
     }
 
-    public bool IsConfigured => _options.IsConfigured;
+    public bool IsConfigured => _credentials.IsConfigured;
 
     /// <summary>Pobiera surowy JSON koszyka użytkownika (weryfikacja, że token działa).</summary>
     public async Task<string> GetCartRawAsync(CancellationToken cancellationToken = default)
     {
-        using var response = await _http.GetAsync($"users/{_options.UserId}/cart", cancellationToken);
+        var creds = _credentials.Snapshot()
+            ?? throw new InvalidOperationException("Brak skonfigurowanego tokena Frisco.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"users/{creds.UserId}/cart");
+        request.Headers.Authorization = new AuthenticationHeaderValue(creds.Scheme, creds.Token);
+
+        using var response = await _http.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStringAsync(cancellationToken);
     }
