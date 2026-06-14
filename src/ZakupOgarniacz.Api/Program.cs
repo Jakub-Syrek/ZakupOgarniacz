@@ -1,4 +1,5 @@
 using ZakupOgarniacz.Api.Endpoints;
+using ZakupOgarniacz.Infrastructure.Frisco;
 using ZakupOgarniacz.Providers.Frisco;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,6 +16,9 @@ builder.Services.AddSqliteCartStore(
 
 // Zalogowany klient Frisco (auto-checkout do ekranu płatności) — token z konfiguracji.
 builder.Services.AddFriscoCheckout(builder.Configuration);
+
+// Auto-login do Frisco (Playwright) — automatyczne pozyskanie tokenu.
+builder.Services.AddFriscoAutoLogin(builder.Configuration);
 
 // Parser poleceń w naturalnym języku → lista zakupów (Claude).
 builder.Services.AddClaudeShoppingParser(builder.Configuration);
@@ -146,6 +150,39 @@ app.MapGet("/frisco/token/status", (FriscoCredentialStore store) =>
    .WithName("FriscoTokenStatus")
    .WithTags("FriscoCheckout");
 
+// Auto-login (Playwright): bez loginu/hasła → tryb interaktywny (okno + ręczne logowanie usera);
+// z loginem+hasłem → tryb bezobsługowy. Token trafia wprost do magazynu (NIE jest zwracany do UI).
+app.MapPost("/frisco/auto-login", async (
+    AutoLoginRequest? request,
+    FriscoAutoLogin autoLogin,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var result = await autoLogin.CaptureAndStoreAsync(request?.Username, request?.Password, cancellationToken);
+        return Results.Ok(new
+        {
+            configured = true,
+            mode = result.HasRefreshToken ? "refresh" : "access",
+            userId = result.UserId,
+        });
+    }
+    catch (FriscoManualStepRequiredException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: 409);
+    }
+    catch (FriscoLoginException ex)
+    {
+        return Results.Problem(ex.Message, statusCode: 502);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem("Auto-login Frisco: " + ex.Message, statusCode: 500);
+    }
+})
+.WithName("FriscoAutoLogin")
+.WithTags("FriscoCheckout");
+
 app.Run();
 
 // Żądanie ustawienia poświadczeń Frisco (auto-checkout). Podaj refreshToken lub accessToken.
@@ -154,6 +191,9 @@ internal sealed record SetFriscoTokenRequest(
     string? AccessToken,
     string? RefreshToken,
     string? ClientId);
+
+// Żądanie auto-loginu. Puste pola ⇒ tryb interaktywny (logujesz się sam w oknie przeglądarki).
+internal sealed record AutoLoginRequest(string? Username, string? Password);
 
 // Udostępnione dla testów integracyjnych (WebApplicationFactory<Program>).
 public partial class Program { }

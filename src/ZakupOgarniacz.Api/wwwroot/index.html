@@ -74,7 +74,12 @@
 
       <hr style="border-color:var(--line); margin:16px 0">
       <h2>Auto-checkout (Frisco)</h2>
-      <div class="muted" style="margin-bottom:8px">Wklej <b>refresh_token</b> z sesji Frisco (DevTools → Network → <code>POST /connect/token</code> → pole <code>refresh_token</code>). Apka sama mintuje i odnawia access-token. Trzymane tylko w pamięci.</div>
+      <div class="muted" style="margin-bottom:8px">Najłatwiej: kliknij poniżej, zaloguj się w oknie przeglądarki, a apka sama złapie token.</div>
+      <button id="autoLoginBtn" class="primary" style="width:100%;margin-bottom:10px">🔐 Zaloguj automatycznie (otwórz okno Frisco)</button>
+      <details style="margin-bottom:8px">
+        <summary class="muted" style="cursor:pointer">…albo wklej token ręcznie</summary>
+        <div class="muted" style="margin:8px 0">Wklej <b>refresh_token</b> z sesji Frisco (DevTools → Network → <code>POST /connect/token</code> → pole <code>refresh_token</code>). Apka sama mintuje i odnawia access-token. Trzymane tylko w pamięci.</div>
+      </details>
       <input id="fUserId" class="qty" style="width:100%;margin-bottom:6px" placeholder="userId (np. 1831066)">
       <input id="fRefresh" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="refresh_token (zalecane)">
       <input id="fClientId" class="qty" style="width:100%;margin-bottom:6px" placeholder="client_id (domyślnie frisco-web)">
@@ -209,6 +214,20 @@
       } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
     }
 
+    async function autoLogin() {
+      $("friscoOut").style.display = "none";
+      $("friscoStatus").textContent = "Otwieram okno przeglądarki — zaloguj się w Frisco…";
+      try {
+        const r = await fetch("/frisco/auto-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) {
+          $("friscoStatus").textContent = "Zalogowano ✓ (tryb: " + (data.mode || "?") + ", userId: " + (data.userId || "?") + ")";
+        } else {
+          $("friscoStatus").textContent = "Auto-login: HTTP " + r.status + " — " + (data.detail || data.title || "nie udało się");
+        }
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
     async function checkFrisco() {
       $("friscoOut").style.display = "none";
       try {
@@ -267,6 +286,7 @@
       } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
     }
 
+    $("autoLoginBtn").addEventListener("click", autoLogin);
     $("saveTokenBtn").addEventListener("click", saveToken);
     $("checkFriscoBtn").addEventListener("click", checkFrisco);
     $("pushFriscoBtn").addEventListener("click", pushToFrisco);

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using ZakupOgarniacz.Core.Catalog;
 using ZakupOgarniacz.Core.Orders;
+using ZakupOgarniacz.Infrastructure.Frisco;
 using ZakupOgarniacz.Providers.Frisco;
 
 // W namespace Microsoft.Extensions.DependencyInjection, żeby metoda była dostępna
@@ -60,6 +61,22 @@ public static class FriscoServiceCollectionExtensions
             client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
         })
         .AddStandardResilienceHandler();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Rejestruje <see cref="FriscoAutoLogin"/> — automatyczne pozyskanie tokenu Frisco przez
+    /// Playwright (tryb interaktywny lub bezobsługowy). Wymaga przeglądarek Playwright
+    /// (<c>playwright install chromium</c>). Sekcja <c>FriscoCheckout:AutoLogin</c>.
+    /// </summary>
+    public static IServiceCollection AddFriscoAutoLogin(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<FriscoAutoLoginOptions>(configuration.GetSection(FriscoAutoLoginOptions.SectionName));
+        services.AddSingleton(sp => sp.GetRequiredService<IOptions<FriscoAutoLoginOptions>>().Value);
+        services.AddSingleton<FriscoAutoLogin>();
 
         return services;
     }
