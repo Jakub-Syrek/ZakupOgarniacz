@@ -117,22 +117,30 @@ public sealed partial class FriscoAutoLogin
             TaskCreationOptions.RunContinuationsAsynchronously);
         string? userId = null;
 
-        page.Request += (_, request) =>
+        // Nasłuch tokenu/usera podpinamy do strony i do każdej NOWEJ karty/popupu (logowanie OAuth
+        // bywa w osobnym oknie) — inaczej pojedynczy nasłuch przegapia token.
+        void Attach(IPage p)
         {
-            var match = UserIdRegex().Match(request.Url);
-            if (match.Success)
+            p.Request += (_, request) =>
             {
-                userId ??= match.Groups[1].Value;
-            }
-        };
+                var match = UserIdRegex().Match(request.Url);
+                if (match.Success)
+                {
+                    userId ??= match.Groups[1].Value;
+                }
+            };
 
-        page.Response += (_, response) =>
-        {
-            if (response.Url.Contains("/connect/token", StringComparison.OrdinalIgnoreCase))
+            p.Response += (_, response) =>
             {
-                _ = CaptureTokenAsync(response, tokenTcs);
-            }
-        };
+                if (response.Url.Contains("/connect/token", StringComparison.OrdinalIgnoreCase))
+                {
+                    _ = CaptureTokenAsync(response, tokenTcs);
+                }
+            };
+        }
+
+        Attach(page);
+        context.Page += (_, p) => Attach(p);
 
         await page.GotoAsync(
             _options.LoginUrl,
@@ -155,26 +163,52 @@ public sealed partial class FriscoAutoLogin
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(_options.TimeoutMs);
 
-        string? refresh;
-        string? access;
+        // Pętla przechwytywania: token z /connect/token ALBO ze storage przeglądarki (token i tak
+        // tam ląduje, bo SPA Frisco go używa) — odpytujemy wszystkie karty co sekundę aż do skutku.
+        (string? Refresh, string? Access)? capture = null;
         try
         {
-            (refresh, access) = await tokenTcs.Task.WaitAsync(timeoutCts.Token);
+            while (!timeoutCts.IsCancellationRequested)
+            {
+                if (tokenTcs.Task.IsCompletedSuccessfully)
+                {
+                    capture = tokenTcs.Task.Result;
+                    _logger.LogInformation("Auto-login Frisco: token z odpowiedzi /connect/token.");
+                    break;
+                }
+
+                foreach (var p in context.Pages)
+                {
+                    var fromStorage = await ScanStorageAsync(p);
+                    if (fromStorage is not null)
+                    {
+                        capture = fromStorage;
+                        _logger.LogInformation("Auto-login Frisco: token ze storage przeglądarki.");
+                        break;
+                    }
+                }
+
+                if (capture is not null)
+                {
+                    break;
+                }
+
+                await Task.Delay(1000, timeoutCts.Token);
+            }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Profil mógł być już zalogowany (brak nowego /connect/token) — spróbuj ze storage.
-            var fromStorage = await ScanStorageAsync(page);
-            if (fromStorage is null)
-            {
-                throw new FriscoLoginException(
-                    "Nie przechwycono tokenu w wyznaczonym czasie. Upewnij się, że logowanie się powiodło " +
-                    "(w trybie interaktywnym dokończ je w oknie).");
-            }
-
-            (refresh, access) = fromStorage.Value;
+            // Timeout — capture zostaje null, obsłużone niżej.
         }
 
+        if (capture is null)
+        {
+            throw new FriscoLoginException(
+                "Nie przechwycono tokenu (minął limit czasu). Dokończ logowanie w oknie. Jeśli jesteś już " +
+                "zalogowany w tym oknie, odśwież stronę Frisco — token pojawi się w sesji i zostanie złapany.");
+        }
+
+        var (refresh, access) = capture.Value;
         userId ??= UserIdFromJwt(access ?? refresh)
             ?? throw new FriscoLoginException("Przechwycono token, ale nie ustaliłem userId (z URL ani z JWT).");
 
@@ -277,8 +311,11 @@ public sealed partial class FriscoAutoLogin
             var json = await page.EvaluateAsync<string>(
                 """
                 () => {
-                  const grab = (s) => { const o = []; for (let i = 0; i < s.length; i++) { try { const j = JSON.parse(s.getItem(s.key(i))); if (j && (j.refresh_token || j.access_token)) o.push(j); } catch (e) {} } return o; };
-                  return JSON.stringify(grab(localStorage).concat(grab(sessionStorage)));
+                  const found = [];
+                  const consider = (j) => { if (j && typeof j === 'object') { if (j.refresh_token || j.access_token) found.push(j); for (const k in j) { try { if (j[k] && typeof j[k] === 'object') consider(j[k]); } catch (e) {} } } };
+                  const grab = (s) => { for (let i = 0; i < s.length; i++) { try { consider(JSON.parse(s.getItem(s.key(i)))); } catch (e) {} } };
+                  grab(localStorage); grab(sessionStorage);
+                  return JSON.stringify(found);
                 }
                 """);
 
