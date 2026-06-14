@@ -18,6 +18,8 @@ public sealed class ClaudeShoppingListParser : IShoppingListParser
         (po polsku, forma podstawowa/mianownik, bez ilości i jednostek) — oraz `quantity`
         (liczba sztuk lub paczek; domyślnie 1, np. „3 bochenki ciemnego pieczywa” => quantity 3).
         Pomijaj wtrącenia typu „kup mi”, „poproszę”. Zwróć wyłącznie dane w wymaganym formacie.
+        Mając wybór, raczej lepsze i zdrowsze — unikaj niezdrowych i potencjalnie szkodliwych
+        (o ile nie kłóci się to z poleceniem ani preferencjami; to wskazówka przy remisie, nie twardy zakaz).
         """;
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -123,6 +125,8 @@ public sealed class ClaudeShoppingListParser : IShoppingListParser
                „bez laktozy", „dużo białka", „tanio", „eko", „bez cukru") — stosuj jako ZASADĘ do CAŁEJ listy:
                dobieraj pozycje z nimi zgodne, a niezgodne pomijaj lub zastępuj (np. „wegetarianin" => bez mięsa;
                „bez laktozy" => warianty bez laktozy). Możesz doprecyzować `query` zgodnie z predyspozycją.
+            Jeśli użytkownik czegoś NIE lubi / chce uniknąć (np. „nie lubię goudy"), NIE proponuj tego — wpisz
+            w `query` konkretną alternatywę, której nie wyklucza (np. zamiast ogólnego „ser" => „ser grana padano").
             Nie dodawaj pozycji, które nie wynikają ani z polecenia, ani z preferencji.
             """;
     }

@@ -47,6 +47,7 @@ public static class CartEndpoints
                 .Where(p => !string.IsNullOrWhiteSpace(p))
                 .Select(p => p.Trim())
                 .ToList();
+            var (positives, negativeStems) = SplitPreferences(preferences);
 
             IReadOnlyList<ShoppingItem> items;
             try
@@ -65,10 +66,17 @@ public static class CartEndpoints
             foreach (var item in items)
             {
                 var result = await catalog.SearchAsync(item.Query, 1, 5, cancellationToken);
-                // Faworyzujemy produkt pasujący do ulubionych (marka/nazwa), w obrębie dostępnych.
                 var available = result.Items.Where(p => p.Available).ToList();
                 var pool = available.Count > 0 ? available : result.Items.ToList();
-                var product = pool.FirstOrDefault(p => MatchesPreference(p, preferences)) ?? pool.FirstOrDefault();
+                // Wyklucz produkty pasujące do „nie lubię / unikaj / bez…" (tylko jeśli coś zostanie).
+                var allowed = pool.Where(p => !IsExcluded(p, negativeStems)).ToList();
+                if (allowed.Count > 0)
+                {
+                    pool = allowed;
+                }
+
+                // Faworyzuj produkt pasujący do ulubionych (pozytywnych).
+                var product = pool.FirstOrDefault(p => MatchesPreference(p, positives)) ?? pool.FirstOrDefault();
                 if (product is not null)
                 {
                     cart.Add(product, item.Quantity);
@@ -216,5 +224,58 @@ public static class CartEndpoints
         }
 
         return false;
+    }
+
+    // Markery negacji — preferencja z takim zwrotem to „nie chcę tego".
+    private static readonly string[] NegationMarkers =
+        ["nie lub", "nie cierp", "nie chc", "nie znos", "bez ", "unikaj", "unikam", "żadn"];
+
+    // Słowa do pominięcia przy wyciąganiu rdzenia z negatywnej preferencji (negacje + zbyt ogólne kategorie).
+    private static readonly HashSet<string> ExcludeStopwords = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "nie", "lubię", "lubie", "cierpię", "cierpie", "chcę", "chce", "znoszę", "znosze",
+        "bez", "unikaj", "unikam", "żadnych", "żadnego",
+        "ser", "sera", "sery", "mleko", "mleka", "chleb", "chleba", "woda", "wody", "sok", "soku",
+        "napój", "produkt", "produkty", "rzeczy", "typu", "smak",
+    };
+
+    /// <summary>Dzieli preferencje na pozytywne (ulubione) i rdzenie negatywne (do wykluczenia).</summary>
+    private static (List<string> Positives, List<string> NegativeStems) SplitPreferences(IReadOnlyList<string> preferences)
+    {
+        var positives = new List<string>();
+        var negativeStems = new List<string>();
+
+        foreach (var pref in preferences)
+        {
+            var lower = pref.ToLowerInvariant();
+            if (NegationMarkers.Any(marker => lower.Contains(marker)))
+            {
+                foreach (var token in lower.Split([' ', ',', ';', '.', '-'], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (token.Length >= 4 && !ExcludeStopwords.Contains(token))
+                    {
+                        negativeStems.Add(token.Length > 4 ? token[..^1] : token);
+                    }
+                }
+            }
+            else
+            {
+                positives.Add(pref);
+            }
+        }
+
+        return (positives, negativeStems);
+    }
+
+    /// <summary>Czy produkt pasuje do którejś negatywnej preferencji (rdzeń w nazwie/marce) — wtedy go pomijamy.</summary>
+    private static bool IsExcluded(Product product, IReadOnlyList<string> negativeStems)
+    {
+        if (negativeStems.Count == 0)
+        {
+            return false;
+        }
+
+        var haystack = (product.Name + " " + (product.Brand ?? string.Empty)).ToLowerInvariant();
+        return negativeStems.Any(stem => haystack.Contains(stem, StringComparison.Ordinal));
     }
 }
