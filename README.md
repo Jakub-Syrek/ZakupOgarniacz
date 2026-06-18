@@ -1,9 +1,14 @@
 # ZakupOgarniacz
 
-Serwis **ASP.NET Core** do zakupów spożywczych z naciskiem na **analizę żywieniową**.
-Rdzeniem aplikacji jest katalog produktów oraz profil żywieniowy koszyka; samo
-zamawianie jest opcjonalne i schowane za interfejsem, żeby dało się je dołożyć
-później bez ruszania reszty.
+Serwis **ASP.NET Core** do **automatyzacji zakupów spożywczych online**. Rdzeniem jest
+zbudowanie koszyka z katalogu sklepu i możliwie daleko posunięta automatyzacja drogi do
+złożenia zamówienia — od listy/koszyka, przez eksport/deep-link, po (docelowo) złożenie
+zamówienia za użytkownika.
+
+Pierwszy cel: **Frisco.pl** — udostępnia czyste (nieoficjalne) JSON API osiągalne
+serwerowo, **z cenami i dostępnością** w wynikach wyszukiwania. Architektura jest
+**sklep-agnostyczna** (adapter pattern), więc kolejne sklepy dochodzą za tymi samymi
+interfejsami.
 
 <!-- Badge do uzupełnienia po podpięciu CI:
 [![build](https://img.shields.io/badge/build-todo-lightgrey)]()
@@ -15,39 +20,51 @@ później bez ruszania reszty.
 
 ## Cel i zakres
 
-- **Rdzeń (priorytet):** wyszukiwanie produktów spożywczych i analiza ich wartości
-  odżywczych — kalorie, makroskładniki, składniki, alergeny, Nutri-Score.
-- **Koszyk analityczny:** zamiast „złóż zamówienie" — „zbuduj koszyk i policz jego
-  profil żywieniowy" (suma i gęstość odżywcza, ostrzeżenia np. o wysokim cukrze/soli,
-  porównywanie produktów).
-- **Zamawianie / eksport (opcjonalnie, później):** za interfejsem `IOrderProvider`.
-  Uwaga: publiczne API do *składania* zamówień w sklepach spożywczych są rzadkością,
-  więc realistycznie ta część kończy się na eksporcie koszyka (deep-link / lista),
-  a nie pełnym programowym checkoucie.
+- **Katalog sklepu (odczyt):** wyszukiwanie produktów z **cenami i dostępnością**.
+- **Koszyk:** budowanie koszyka po naszej stronie (pozycje, ilości, podsumowanie ceny).
+- **Zamawianie — etapowo:**
+  1. **Eksport koszyka / deep-link** do sklepu (finalne „zamów" klika człowiek).
+  2. **Docelowo:** automatyczne złożenie zamówienia za `IOrderProvider`.
 
-Źródło danych żywieniowych: **Open Food Facts** (otwarte, darmowe API) — wpięte jako
-adapter `OpenFoodFactsProvider` za interfejsem `ICatalogProvider`, więc wymienialne.
+> Analiza żywieniowa **nie** jest celem projektu — wcześniejszy kierunek (Nutri-Score,
+> makroskładniki, Open Food Facts) został porzucony na rzecz automatyzacji zakupów.
+
+## Realia integracji (ważne)
+
+Sklepy **nie udostępniają oficjalnego publicznego API** do składania zamówień jako klient
+(istniejące API są po stronie sprzedawcy/POS, nie klienta). Integracja jest więc
+**nieoficjalna** (reverse-engineering wewnętrznych endpointów) i z natury krucha. Różni
+sklepy różnią się jednak barierą wejścia:
+
+- **Frisco.pl (cel główny)** — wewnętrzne JSON API (`/app/commerce/api/v1/…`) osiągalne
+  zwykłym `HttpClient`-em (brak Cloudflare), z cenami w odpowiedzi. Adapter prosty
+  i testowalny end-to-end.
+- **Carrefour.pl (alternatywa, odłożona)** — strona za **Cloudflare Bot Management**,
+  serwerowy HTTP dostaje `403`. Adapter wymaga **Playwright** (ruch przeglądarkowy);
+  zostaje w repo jako alternatywny `ICatalogProvider`.
+- **Auchan** — zakupy online na zamkniętej platformie Ocado, bez publicznego API klienta.
+
+Mechanizm jest schowany za interfejsami w `Core`, więc wymienialny bez ruszania reszty.
 
 ## Architektura
 
-Projektowana **provider-agnostycznie** (adapter pattern). Reszta aplikacji nie wie,
-z jakiego konkretnie źródła pochodzą dane — zależy tylko od interfejsów w `Core`.
+Provider-agnostycznie (adapter pattern). Reszta aplikacji zależy tylko od interfejsów w `Core`.
 
 | Projekt | Rola |
 | --- | --- |
-| `ZakupOgarniacz.Core` | Domeny i interfejsy (`ICatalogProvider`, `IOrderProvider`), logika analizy żywieniowej |
-| `ZakupOgarniacz.Providers` | Adaptery do zewnętrznych API (`OpenFoodFactsProvider`, …) |
-| `ZakupOgarniacz.Infrastructure` | EF Core, klienty HTTP, Polly (resilience), cache |
+| `ZakupOgarniacz.Core` | Domeny i interfejsy (`ICatalogProvider`, `IOrderProvider`), logika koszyka |
+| `ZakupOgarniacz.Providers` | Adaptery sklepów (`FriscoProvider`, `CarrefourProvider`, …) |
+| `ZakupOgarniacz.Infrastructure` | Klienci HTTP / Playwright, Polly (resilience), cache, (później) EF Core |
 | `ZakupOgarniacz.Api` | Host Web API (minimal API), DI, OpenAPI/Swagger |
 
 Kluczowe interfejsy w `Core`:
 
-- `ICatalogProvider` — `SearchAsync`, `GetProductAsync`, `GetNutritionAsync`
-- `IOrderProvider` — `CreateCartAsync`, `AddItemAsync`, `PlaceOrderAsync` lub `ExportCartAsync`
+- `ICatalogProvider` — `SearchAsync`, `GetProductAsync` (produkt z ceną i dostępnością)
+- `IOrderProvider` — `ExportCartAsync` (lista/deep-link) → docelowo `PlaceOrderAsync`
 
 Przekrojowo: `IHttpClientFactory` + typed clients, **Polly** (retry, circuit breaker)
-przez `Microsoft.Extensions.Http.Resilience`, cache katalogu, **Serilog**, OpenAPI.
-Persystencja: **EF Core + SQLite** na start (koszyk, historia cen), przełączalne na Postgres.
+przez `Microsoft.Extensions.Http.Resilience`; dla sklepów za anti-botem — **Playwright**.
+Persystencja koszyka/historii: **EF Core + SQLite** (krok później), przełączalne na Postgres.
 
 ## Struktura repo
 
@@ -69,18 +86,21 @@ README.md
 ## Stack
 
 - .NET 10 (LTS), ASP.NET Core Web API (minimal API)
-- EF Core (SQLite → opcjonalnie Postgres)
-- Microsoft.Extensions.Http.Resilience (Polly), Serilog, OpenAPI
+- Microsoft.Extensions.Http.Resilience (Polly), OpenAPI
+- Microsoft.Playwright — dla sklepów za Cloudflare (Carrefour)
+- EF Core (SQLite → opcjonalnie Postgres) — krok później
 - xUnit + Microsoft.AspNetCore.Mvc.Testing
 
 ## Roadmapa
 
-1. **Szkielet + read-only katalog** — `ICatalogProvider`, adapter Open Food Facts,
-   endpointy `search` / `product` z danymi żywieniowymi.
-2. **Koszyk + persystencja** — EF Core, model `Cart`/`CartItem`, profil żywieniowy koszyka.
-3. **Analiza** — sumy i gęstość odżywcza, ostrzeżenia, porównania produktów.
-4. **Eksport koszyka** (opcjonalnie) — `IOrderProvider` jako deep-link / lista.
-5. **Dodatki** — śledzenie cen (`BackgroundService`), powiadomienia, frontend (Blazor/MAUI).
+1. ✅ **Domena + szkielet** — interfejsy `ICatalogProvider` / `IOrderProvider`, modele
+   (`Product` z ceną, `Cart` / `CartItem`), endpointy katalogu.
+2. ✅ **Adapter Frisco (odczyt)** — wyszukiwanie z cenami przez `/offer/products/query`,
+   mapowanie na modele domenowe (zweryfikowane end-to-end).
+3. 🟦 **Koszyk + eksport** — endpointy koszyka i `ExportCartAsync` gotowe (store in-memory);
+   persystencja (EF Core + SQLite) następna.
+4. **Auto-checkout (docelowo)** — `PlaceOrderAsync` (sesja / automatyzacja).
+5. **Dodatki** — kolejne sklepy za tym samym interfejsem (np. Pyszne jako agregator), porównanie cen, frontend.
 
 ## Start
 
@@ -89,10 +109,29 @@ dotnet build
 dotnet run --project src/ZakupOgarniacz.Api
 ```
 
+Adapter Frisco działa „od ręki" (zwykły HTTP). Endpointy:
+
+| Metoda | Ścieżka | Opis |
+| --- | --- | --- |
+| `GET` | `/health` | Health-check. |
+| `GET` | `/products/search?q={fraza}&page&pageSize` | Wyszukiwanie z cenami i dostępnością. |
+| `GET` | `/products/{code}` | Produkt po EAN/SKU/id (`404`, gdy brak). |
+| `POST` | `/carts` | Tworzy koszyk (`201`, zwraca `id`). |
+| `GET` | `/carts/{id}` | Koszyk: pozycje + suma (`404`, gdy brak). |
+| `POST` | `/carts/{id}/items` | Dodaje pozycję `{ code, quantity }` (scala po produkcie). |
+| `POST` | `/carts/{id}/export` | Eksport koszyka do listy (etap 1 „zamawiania"). |
+
+```bash
+curl "http://localhost:<port>/products/search?q=mleko&pageSize=5"
+```
+
+> Adapter **Carrefour** (alternatywny) wymaga Playwright: po zbudowaniu
+> `pwsh src/ZakupOgarniacz.Api/bin/Debug/net10.0/playwright.ps1 install chromium`
+> i przełączenia DI na `AddCarrefourStore`.
+
 ## Konwencje
 
 - **Conventional Commits.**
-- Pierwszy commit może wylądować na `master`; cała dalsza praca na branchach
-  tworzonych od `master`.
+- Pierwszy commit wylądował na `master`; cała dalsza praca na branchach tworzonych od `master`.
 - `CLAUDE.md` jest w `.gitignore` i **nie jest** wersjonowany.
 - Przy zmianach w CI/CD aktualizować badge w README (build, tests, coverage, wersja .NET).

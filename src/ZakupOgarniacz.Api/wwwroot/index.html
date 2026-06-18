@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZakupOgarniacz — Frisco</title>
+  <style>
+    :root { --bg:#0f1216; --panel:#171c23; --line:#262d36; --txt:#e8ecf1; --muted:#93a0b0; --accent:#3fb950; --accent2:#2f81f7; --warn:#d29922; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--txt); }
+    header { padding:16px 20px; border-bottom:1px solid var(--line); display:flex; gap:16px; align-items:center; position:sticky; top:0; background:var(--bg); z-index:5; }
+    header h1 { font-size:18px; margin:0; white-space:nowrap; }
+    header .sub { color:var(--muted); font-size:13px; }
+    .search { flex:1; display:flex; gap:8px; max-width:640px; }
+    .search input { flex:1; padding:10px 12px; background:var(--panel); border:1px solid var(--line); border-radius:8px; color:var(--txt); font-size:15px; }
+    button { cursor:pointer; border:1px solid var(--line); background:var(--panel); color:var(--txt); border-radius:8px; padding:9px 14px; font-size:14px; }
+    button.primary { background:var(--accent2); border-color:var(--accent2); color:#fff; }
+    button.primary:hover { filter:brightness(1.1); }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .layout { display:grid; grid-template-columns: 1fr 360px; gap:20px; padding:20px; align-items:start; }
+    @media (max-width: 900px){ .layout { grid-template-columns:1fr; } aside { position:static; max-height:none; overflow:visible; } }
+    .grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(190px,1fr)); gap:14px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:8px; }
+    .card img { width:100%; height:120px; object-fit:contain; background:#fff; border-radius:8px; }
+    .card .name { font-size:14px; font-weight:600; line-height:1.3; min-height:36px; }
+    .card .brand { font-size:12px; color:var(--muted); }
+    .card .size { font-size:12px; color:var(--muted); }
+    .price { font-size:16px; font-weight:700; }
+    .price .old { color:var(--muted); text-decoration:line-through; font-weight:400; font-size:13px; margin-right:6px; }
+    .price .promo { color:var(--accent); }
+    .row { display:flex; gap:8px; align-items:center; }
+    .row .qty { width:54px; padding:7px; background:var(--bg); border:1px solid var(--line); border-radius:8px; color:var(--txt); }
+    .badge { font-size:11px; padding:2px 7px; border-radius:999px; border:1px solid var(--line); color:var(--muted); }
+    .badge.no { color:var(--warn); border-color:var(--warn); }
+    aside { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:16px; position:sticky; top:78px; max-height:calc(100vh - 98px); overflow-y:auto; }
+    aside h2 { font-size:15px; margin:0 0 10px; }
+    .citem { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); font-size:11.5px; }
+    .citem .cthumb { width:34px; height:34px; flex:0 0 auto; object-fit:contain; background:#fff; border-radius:6px; display:inline-block; }
+    .citem .cname { flex:1; line-height:1.25; }
+    .citem .cprice { white-space:nowrap; font-weight:600; }
+    .citem .q { color:var(--muted); }
+    .total { display:flex; justify-content:space-between; font-weight:700; margin:12px 0; font-size:16px; }
+    .muted { color:var(--muted); font-size:12px; }
+    .note { font-size:12px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; padding:10px; margin-top:12px; }
+    .chip { display:inline-flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--accent); color:var(--txt); border-radius:999px; padding:4px 6px 4px 11px; font-size:12px; margin:0 6px 6px 0; }
+    .chip .chipx { background:none; border:none; color:var(--muted); padding:0 2px; font-size:15px; line-height:1; cursor:pointer; }
+    .chip .chipx:hover { color:var(--warn); }
+    #prefList:empty { display:none; }
+    pre { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px; font-size:12px; max-height:220px; overflow:auto; }
+    .empty { color:var(--muted); padding:40px; text-align:center; }
+    /* --- logo / branding (szmery-bajery) --- */
+    .brand { display:flex; align-items:center; gap:12px; }
+    .logo { position:relative; width:44px; height:44px; flex:0 0 auto; }
+    .logo svg { width:44px; height:44px; display:block; filter:drop-shadow(0 3px 10px rgba(47,129,247,.5)); }
+    .logo::before { content:""; position:absolute; inset:-5px; border-radius:16px; z-index:-1; filter:blur(11px); opacity:.55;
+      background:conic-gradient(from 0deg, var(--accent), var(--accent2), #a371f7, var(--accent)); animation:spin 7s linear infinite; }
+    .wordmark { display:flex; flex-direction:column; line-height:1.05; }
+    .title { font-size:20px; font-weight:800; margin:0; letter-spacing:-.2px; white-space:nowrap;
+      background:linear-gradient(90deg,#e8ecf1,#9fd0ff 38%,#8affc1 66%,#e8ecf1); background-size:220% auto;
+      -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;
+      animation:sheen 6s linear infinite; }
+    .tag { font-size:10.5px; color:var(--muted); letter-spacing:1.2px; text-transform:uppercase; margin-top:2px; }
+    .spark { transform-box:fill-box; transform-origin:center; animation:twinkle 2.6s ease-in-out infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    @keyframes sheen { to { background-position:220% center; } }
+    @keyframes twinkle { 0%,100% { opacity:.55; transform:scale(.78) rotate(0); } 50% { opacity:1; transform:scale(1.18) rotate(18deg); } }
+    @media (prefers-reduced-motion: reduce) { .logo::before, .title, .spark { animation:none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ZakupOgarniacz">
+          <defs>
+            <linearGradient id="zg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#3fb950"/>
+              <stop offset="1" stop-color="#2f81f7"/>
+            </linearGradient>
+          </defs>
+          <rect x="2" y="2" width="40" height="40" rx="12" fill="url(#zg)"/>
+          <rect x="2" y="2" width="40" height="20" rx="12" fill="#fff" opacity=".12"/>
+          <g transform="translate(8,8.5)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+            <circle cx="9" cy="21" r="1.7" fill="#fff" stroke="none"/>
+            <circle cx="20" cy="21" r="1.7" fill="#fff" stroke="none"/>
+          </g>
+          <g class="spark">
+            <path d="M32 8.5l1.3 3.4 3.4 1.3-3.4 1.3-1.3 3.4-1.3-3.4-3.4-1.3 3.4-1.3z" fill="#fff"/>
+          </g>
+        </svg>
+      </span>
+      <div class="wordmark">
+        <h1 class="title">ZakupOgarniacz</h1>
+        <span class="tag">AI zakupy · Frisco.pl</span>
+      </div>
+    </div>
+    <form class="search" id="searchForm">
+      <input id="q" placeholder="Szukaj produktu (np. mleko, masło, chleb)…" autocomplete="off" />
+      <button class="primary" type="submit">Szukaj</button>
+    </form>
+  </header>
+
+  <div class="layout">
+    <main>
+      <div class="note" style="margin-bottom:12px">
+        Napisz zwykłym językiem, co chcesz kupić — model <b>Claude Opus 4.8</b> (<code>claude-opus-4-8</code>) ułoży z tego listę i dobierze produkty z <b>realnej, aktualnej oferty Frisco.pl</b> (z cenami). Listę możesz potem poprawić ręcznie i wypchnąć koszyk do Frisco.
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <input id="cmd" class="qty" style="flex:1" placeholder="Powiedz, co kupić… np. 3 bochenki ciemnego pieczywa, czekoladę, pomarańcze, brzoskwinie i borówki">
+        <button class="primary" id="cmdBtn">Wygeneruj koszyk</button>
+      </div>
+      <div class="row" style="margin-bottom:6px">
+        <input id="prefInput" class="qty" style="flex:1" placeholder="Ulubione i preferencje — np. Łaciate, tofu, wegetarianin, dużo białka, bez laktozy, tanio… Enter dodaje">
+        <button id="prefAddBtn">★ Dodaj do ulubionych</button>
+      </div>
+      <div id="prefList" style="margin-bottom:10px"></div>
+      <div id="cmdOut" class="muted" style="margin-bottom:10px"></div>
+      <div id="status" class="muted"></div>
+      <div id="grid" class="grid"></div>
+    </main>
+
+    <aside>
+      <h2>Koszyk</h2>
+      <div id="cart"><div class="empty">Pusty</div></div>
+      <div class="total"><span>Razem</span><span id="total">—</span></div>
+      <button id="clearCartBtn" style="width:100%;margin-bottom:6px" disabled>🗑️ Wyczyść koszyk</button>
+      <button class="primary" id="exportBtn" style="width:100%" disabled>Przejdź do realizacji</button>
+      <div class="note">Płatność i dostawę finalizujesz w Frisco — tu budujesz koszyk i eksportujesz go do realizacji.</div>
+      <div id="exportOut"></div>
+
+      <hr style="border-color:var(--line); margin:16px 0">
+      <h2>Auto-checkout (Frisco)</h2>
+      <div class="muted" style="margin-bottom:8px">Kliknij, zaloguj się w oknie przeglądarki, a apka sama złapie i będzie odnawiać token.</div>
+      <button id="autoLoginBtn" class="primary" style="width:100%;margin-bottom:6px">🔐 Zaloguj automatycznie (otwórz okno Frisco)</button>
+      <button id="checkFriscoBtn" style="width:100%;margin-bottom:6px">Sprawdź koszyk Frisco</button>
+      <button id="pushFriscoBtn" class="primary" style="width:100%">Wrzuć nasz koszyk do Frisco →</button>
+      <div class="row" style="margin-top:6px">
+        <input id="fPostcode" class="qty" style="flex:1" placeholder="kod pocztowy (np. 00-001)">
+        <button id="deliveryBtn">Terminy dostawy</button>
+      </div>
+      <details style="margin-top:10px">
+        <summary class="muted" style="cursor:pointer">…albo wklej token ręcznie (fallback)</summary>
+        <div class="muted" style="margin:8px 0">Gdyby auto-login zawiódł: wklej <b>refresh_token</b> z sesji Frisco (DevTools → Network → <code>POST /connect/token</code> → pole <code>refresh_token</code>). Trzymane tylko w pamięci.</div>
+        <input id="fUserId" class="qty" style="width:100%;margin-bottom:6px" placeholder="userId (np. 1831066)">
+        <input id="fRefresh" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="refresh_token (zalecane)">
+        <input id="fClientId" class="qty" style="width:100%;margin-bottom:6px" placeholder="client_id (domyślnie frisco-web)">
+        <input id="fToken" type="password" class="qty" style="width:100%;margin-bottom:6px" placeholder="albo access_token (wygasa ~10 min)">
+        <button id="saveTokenBtn" style="width:100%">Zapisz token ręczny</button>
+      </details>
+      <div id="friscoStatus" class="muted" style="margin-top:8px"></div>
+      <pre id="friscoOut" style="display:none"></pre>
+    </aside>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const zl = (m) => m == null ? "—" : (Number(m.amount).toFixed(2).replace(".", ",") + " zł");
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      if (!res.ok) throw new Error(path + " → HTTP " + res.status);
+      return res.status === 204 ? null : res.json();
+    }
+
+    let cartId = localStorage.getItem("cartId");
+
+    async function ensureCart() {
+      if (cartId) return cartId;
+      const cart = await api("/carts", { method: "POST" });
+      cartId = cart.id;
+      localStorage.setItem("cartId", cartId);
+      return cartId;
+    }
+
+    function priceHtml(p) {
+      if (!p.price) return '<span class="price">—</span>';
+      if (p.promotionalPrice) {
+        return `<span class="price"><span class="old">${zl(p.price)}</span><span class="promo">${zl(p.promotionalPrice)}</span></span>`;
+      }
+      return `<span class="price">${zl(p.price)}</span>`;
+    }
+
+    function card(p) {
+      const img = p.imageUrl ? `<img src="${p.imageUrl}" alt="" onerror="this.style.visibility='hidden'">` : `<div style="height:120px"></div>`;
+      const avail = p.available ? "" : '<span class="badge no">niedostępny</span>';
+      const dis = p.available ? "" : "disabled";
+      return `<div class="card">
+        ${img}
+        <div class="name">${p.name || "(bez nazwy)"}</div>
+        <div class="brand">${p.brand || ""} ${avail}</div>
+        <div class="size">${p.size || ""}</div>
+        ${priceHtml(p)}
+        <div class="row">
+          <input class="qty" type="number" min="1" value="1" id="qty_${p.id}">
+          <button ${dis} onclick="add('${p.id}')" style="flex:1">Dodaj</button>
+        </div>
+      </div>`;
+    }
+
+    async function search(q) {
+      $("status").textContent = "Szukam…";
+      $("grid").innerHTML = "";
+      try {
+        const r = await api("/products/search?q=" + encodeURIComponent(q) + "&pageSize=24");
+        $("status").textContent = `Znaleziono ${r.totalCount} (pokazuję ${r.items.length}).`;
+        $("grid").innerHTML = r.items.map(card).join("");
+      } catch (e) { $("status").textContent = "Błąd: " + e.message; }
+    }
+
+    async function add(code) {
+      const qty = parseInt($("qty_" + code)?.value || "1", 10);
+      try {
+        await ensureCart();
+        await api(`/carts/${cartId}/items`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, quantity: qty })
+        });
+        await refreshCart();
+      } catch (e) { alert("Nie udało się dodać: " + e.message); }
+    }
+
+    async function refreshCart() {
+      if (!cartId) return;
+      let cart;
+      try { cart = await api(`/carts/${cartId}`); }
+      catch { localStorage.removeItem("cartId"); cartId = null; return; }
+      const items = cart.items || [];
+      $("cart").innerHTML = items.length
+        ? items.map(i => {
+            const t = i.product.imageUrl ? `<img class="cthumb" src="${i.product.imageUrl}" alt="" onerror="this.style.visibility='hidden'">` : `<span class="cthumb"></span>`;
+            return `<div class="citem">${t}<span class="cname">${i.product.name} <span class="q">×${i.quantity}</span></span><span class="cprice">${zl(i.lineTotal)}</span></div>`;
+          }).join("")
+        : '<div class="empty">Pusty</div>';
+      $("cart").closest("aside")?.scrollTo({ top: 0 });
+      $("total").textContent = cart.total ? zl(cart.total) : (items.length ? "częściowo bez cen" : "—");
+      $("exportBtn").disabled = items.length === 0;
+      $("clearCartBtn").disabled = items.length === 0;
+    }
+
+    async function clearCart() {
+      if (!cartId) return;
+      if (!confirm("Wyczyścić cały koszyk?")) return;
+      try {
+        await api(`/carts/${cartId}/clear`, { method: "POST" });
+        $("cmdOut").textContent = "";
+        $("exportOut").innerHTML = "";
+        await refreshCart();
+      } catch (e) { alert("Nie udało się wyczyścić: " + e.message); }
+    }
+
+    async function exportCart() {
+      if (!cartId) return;
+      const r = await api(`/carts/${cartId}/export`, { method: "POST" });
+      const lines = (r.lines || []).map(l => `• ${l.productName} ×${l.quantity}`).join("\n");
+      $("exportOut").innerHTML = `<div class="muted" style="margin-top:10px">Lista do realizacji w Frisco:</div><pre>${lines || "(pusto)"}</pre>`;
+    }
+
+    async function loadFriscoStatus() {
+      try { const s = await api("/frisco/token/status"); $("friscoStatus").textContent = s.configured ? "Token: ustawiony ✓" : "Token: brak"; } catch {}
+    }
+
+    async function saveToken() {
+      const userId = $("fUserId").value.trim();
+      const refreshToken = $("fRefresh").value.trim() || undefined;
+      const clientId = $("fClientId").value.trim() || undefined;
+      const accessToken = $("fToken").value.trim() || undefined;
+      if (!userId || (!refreshToken && !accessToken)) { $("friscoStatus").textContent = "Podaj userId i refresh_token (lub access_token)."; return; }
+      try {
+        const r = await api("/frisco/token", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, refreshToken, clientId, accessToken }) });
+        $("fRefresh").value = ""; $("fToken").value = "";
+        $("friscoStatus").textContent = "Zapisano ✓ (tryb: " + (r.mode || "?") + ")";
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
+    async function autoLogin() {
+      $("friscoOut").style.display = "none";
+      $("friscoStatus").textContent = "Otwieram okno przeglądarki — zaloguj się w Frisco…";
+      try {
+        const r = await fetch("/frisco/auto-login", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await r.json().catch(() => ({}));
+        if (r.ok) {
+          $("friscoStatus").textContent = "Zalogowano ✓ (tryb: " + (data.mode || "?") + ", userId: " + (data.userId || "?") + ")";
+        } else {
+          $("friscoStatus").textContent = "Auto-login: HTTP " + r.status + " — " + (data.detail || data.title || "nie udało się");
+        }
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
+    async function checkFrisco() {
+      $("friscoOut").style.display = "none";
+      try {
+        const r = await fetch("/frisco/cart");
+        const txt = await r.text();
+        $("friscoStatus").textContent = "GET /frisco/cart → HTTP " + r.status + (r.ok ? " ✓" : "");
+        $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 1500);
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
+    let prefs = [];
+    try { prefs = JSON.parse(localStorage.getItem("prefs") || "[]"); } catch { prefs = []; }
+    const escPref = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    function renderPrefs() {
+      $("prefList").innerHTML = prefs.map((p, i) =>
+        `<span class="chip">★ ${escPref(p)}<button class="chipx" data-i="${i}" aria-label="Usuń">×</button></span>`).join("");
+      $("prefList").querySelectorAll(".chipx").forEach(b =>
+        b.addEventListener("click", () => { prefs.splice(+b.dataset.i, 1); savePrefs(); }));
+    }
+    function savePrefs() { localStorage.setItem("prefs", JSON.stringify(prefs)); renderPrefs(); }
+    function addPref() {
+      const v = $("prefInput").value.trim();
+      if (v && !prefs.some(p => p.toLowerCase() === v.toLowerCase())) { prefs.push(v); savePrefs(); }
+      $("prefInput").value = "";
+    }
+    $("prefAddBtn").addEventListener("click", addPref);
+    $("prefInput").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addPref(); } });
+    renderPrefs();
+
+    async function fromCommand() {
+      const command = $("cmd").value.trim();
+      if (!command) return;
+      $("cmdOut").textContent = "Generuję listę…";
+      try {
+        const r = await fetch("/carts/from-command", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command, cartId: cartId || undefined, preferences: prefs })
+        });
+        if (r.status === 503) { $("cmdOut").textContent = "Parser niedostępny: ustaw klucz Anthropic API (ANTHROPIC_API_KEY)."; return; }
+        if (!r.ok) { $("cmdOut").textContent = "Błąd: HTTP " + r.status; return; }
+        const data = await r.json();
+        cartId = data.cartId; localStorage.setItem("cartId", cartId);
+        $("cmdOut").innerHTML = (data.report || []).map(x => x.matched
+          ? `<span style="color:var(--accent)">✓ ${x.query} ×${x.quantity}</span> → ${x.matched}`
+          : `<span style="color:var(--warn)">✗ ${x.query} — nie znaleziono</span>`).join(" &nbsp;•&nbsp; ");
+        await refreshCart();
+      } catch (e) { $("cmdOut").textContent = "Błąd: " + e.message; }
+    }
+    $("cmdBtn").addEventListener("click", fromCommand);
+    $("cmd").addEventListener("keydown", (e) => { if (e.key === "Enter") fromCommand(); });
+
+    $("searchForm").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value.trim(); if (q) search(q); });
+    $("exportBtn").addEventListener("click", exportCart);
+    $("clearCartBtn").addEventListener("click", clearCart);
+    async function pushToFrisco() {
+      if (!cartId) { $("friscoStatus").textContent = "Najpierw zbuduj koszyk."; return; }
+      $("friscoOut").style.display = "none";
+      try {
+        const r = await fetch(`/carts/${cartId}/push-to-frisco`, { method: "POST" });
+        const txt = await r.text();
+        $("friscoStatus").textContent = "Push → HTTP " + r.status + (r.ok ? " ✓ — dokończ dostawę i płatność w Frisco" : "");
+        $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 800);
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
+    async function loadDelivery() {
+      const pc = $("fPostcode").value.trim();
+      if (!pc) { $("friscoStatus").textContent = "Podaj kod pocztowy."; return; }
+      $("friscoOut").style.display = "none";
+      try {
+        const r = await fetch("/frisco/delivery?postcode=" + encodeURIComponent(pc));
+        const txt = await r.text();
+        $("friscoStatus").textContent = "Terminy dostawy → HTTP " + r.status;
+        $("friscoOut").style.display = "block"; $("friscoOut").textContent = txt.slice(0, 1500);
+      } catch (e) { $("friscoStatus").textContent = "Błąd: " + e.message; }
+    }
+
+    $("autoLoginBtn").addEventListener("click", autoLogin);
+    $("saveTokenBtn").addEventListener("click", saveToken);
+    $("checkFriscoBtn").addEventListener("click", checkFrisco);
+    $("pushFriscoBtn").addEventListener("click", pushToFrisco);
+    $("deliveryBtn").addEventListener("click", loadDelivery);
+
+    // start
+    refreshCart();
+    loadFriscoStatus();
+    search("mleko");
+  </script>
+</body>
+</html>
